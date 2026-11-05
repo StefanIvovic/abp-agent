@@ -14,6 +14,7 @@ x-app: &app
     MLFLOW_TRACKING_URI: http://mlflow:5000
     PREFECT_API_URL: http://prefect-server:4200/api
     API_URL: http://api:8000
+    ABP_REPO_DIR: /sources/abp              # inside the container; .env holds the host path for the mount
     GIT_PYTHON_REFRESH: quiet               # MLflow probes for git, which isn't in the image
   extra_hosts:
     - "host.docker.internal:host-gateway"   # lets containers reach the LLM server on the host
