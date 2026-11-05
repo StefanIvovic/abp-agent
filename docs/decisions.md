@@ -11,3 +11,5 @@
 | D7 | Forum questions are drawn by seeded random sample, with written selection rules | Hand-picking favours easy questions. See `evals/README.md` |
 | D8 | The test split is sealed by hash after human review | The earlier prototype changed test keys after seeing results. A change now has to be deliberate and visible |
 | D9 | Eval cases can carry chat history | The repeated-answer bug needed history, so single-turn cases couldn't catch it |
+| D10 | Agent model is qwen3.8-27b; the router uses JSON schema output | Measured before writing the agent. See `docs/model-trial.md`: JSON schema 75 of 75, forced tool call 70 of 75 |
+| D11 | Don't rely on the model to pick code over docs | Both 27B models searched the docs first on all 4 code-only cases. Phase 3 and 5 must make code reachable anyway, for example one search over both sources |

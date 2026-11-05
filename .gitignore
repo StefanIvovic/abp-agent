@@ -9,3 +9,4 @@ mlruns/
 mlartifacts/
 .idea/
 .vscode/
+evals/results/
