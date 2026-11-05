@@ -53,6 +53,9 @@ class CodeType:
     start_line: int
     end_line: int
     members: list[CodeMember] = field(default_factory=list)
+    bases: list[str] = field(default_factory=list)        # simple names: base class, interfaces
+    depends_on: list[str] = field(default_factory=list)   # from [DependsOn(typeof(X))]
+    is_abstract: bool = False
 
 
 @dataclass
@@ -93,6 +96,38 @@ def _members(body: Node, source: bytes) -> list[CodeMember]:
             for m in body.named_children if m.type != "comment"]
 
 
+def simple_name(text: str) -> str:
+    """Volo.Abp.IFoo<Bar> -> IFoo; Base(arg) -> Base"""
+    return re.split(r"[<(]", text, maxsplit=1)[0].strip().rsplit(".", 1)[-1]
+
+
+def _descendants(node: Node, kind: str) -> list[Node]:
+    found = [c for c in node.named_children if c.type == kind]
+    return found + [d for c in node.named_children for d in _descendants(c, kind)]
+
+
+def _bases(node: Node, source: bytes) -> list[str]:
+    lists = [c for c in node.named_children if c.type == "base_list"]
+    return [simple_name(_text(source, b.start_byte, b.end_byte))
+            for bl in lists for b in bl.named_children if b.type != "comment"]
+
+
+def _depends_on(node: Node, source: bytes) -> list[str]:
+    """Real typeof() nodes, so a commented-out dependency doesn't count."""
+    names = []
+    for attribute in _descendants(node, "attribute"):
+        if _name(attribute, source).rsplit(".", 1)[-1] in ("DependsOn", "DependsOnAttribute"):
+            for t in _descendants(attribute, "typeof_expression"):
+                kind = t.child_by_field_name("type")
+                names.append(simple_name(_text(source, kind.start_byte, kind.end_byte)))
+    return list(dict.fromkeys(names))
+
+
+def _is_abstract(node: Node, source: bytes) -> bool:
+    return any(c.type == "modifier" and _text(source, c.start_byte, c.end_byte) == "abstract"
+               for c in node.children)
+
+
 def _walk(node: Node, source: bytes, namespace: str, found: list[CodeType]) -> None:
     for child in node.named_children:
         if child.type == "file_scoped_namespace_declaration":
@@ -108,13 +143,20 @@ def _walk(node: Node, source: bytes, namespace: str, found: list[CodeType]) -> N
                 re.sub(r"\s+", " ", _text(source, child.start_byte, start)).strip(),
                 _text(source, _leading_start(child), child.end_byte),
                 child.start_point[0] + 1, child.end_point[0] + 1,
-                _members(body, source) if body else []))
+                _members(body, source) if body else [], _bases(child, source),
+                _depends_on(child, source), _is_abstract(child, source)))
 
 
 def parse_types(source: bytes) -> list[CodeType]:
     found: list[CodeType] = []
     _walk(_PARSER.parse(source).root_node, source, "", found)
     return found
+
+
+def package_of(path: str) -> str:
+    """The project folder: framework/src/Volo.Abp.Core/... -> Volo.Abp.Core"""
+    parts = path.split("/")
+    return parts[2] if parts[0] == "framework" else parts[3]
 
 
 def category_of(path: str) -> str:

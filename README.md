@@ -35,6 +35,16 @@ Invoke-RestMethod -Method Post http://localhost:8011/search -Body $body -Content
 
 # Retrieval eval on dev questions, logged to MLflow experiment "retrieval"
 docker compose run --rm -v "${PWD}:/app" api python -m evals.retrieval_eval
+
+# Build the graph (after ingest; no LLM, about a minute and a half)
+docker compose exec pipelines prefect deployment run "build-graph/build" --watch
+
+# Exact facts: kind = depends_on | all_dependencies | used_by | all_used_by | implementations |
+# bases | options | module_of_options | docs
+Invoke-RestMethod "http://localhost:8011/graph/relation?name=IEmailSender&kind=implementations"
+
+# Closed-list eval, logged to MLflow experiment "graph"
+docker compose run --rm -v "${PWD}:/app" api python -m evals.graph_eval
 ```
 
 ## Common commands

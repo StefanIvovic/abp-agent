@@ -3,6 +3,7 @@
 from prefect import flow, get_run_logger, serve
 
 from abp_agent import __version__
+from abp_agent.pipelines.graph import build_graph
 from abp_agent.pipelines.ingest import ingest
 
 
@@ -17,6 +18,7 @@ def main() -> None:
     serve(
         smoke_test.to_deployment(name="smoke-test", tags=["platform"]),
         ingest.to_deployment(name="ingest", tags=["data"]),
+        build_graph.to_deployment(name="build", tags=["data"]),
     )
 
 
