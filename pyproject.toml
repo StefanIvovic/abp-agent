@@ -21,6 +21,11 @@ dependencies = [
     "tree-sitter>=0.25",
     "tree-sitter-c-sharp>=0.23",
     "mlflow>=3.17,<3.18",           # same minor as the tracking server
+    # Phase 5: agent
+    "langgraph>=1.0",
+    "langchain-openai>=1.0",
+    "langgraph-checkpoint-postgres>=3.0",
+    "psycopg-pool>=3.2",
 ]
 
 [dependency-groups]
@@ -52,3 +57,6 @@ exclude = ["alembic"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "C4", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/abp_agent/agent/assistant.py" = ["E501"]   # prompts read better unwrapped

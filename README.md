@@ -5,7 +5,7 @@ Answers ABP Framework questions from its docs and source code, with citations. S
 
 ## Run
 
-Requires Docker Desktop, an NVIDIA GPU and a local clone of
+Requires Docker Desktop, a local model server and a local clone of
 [abpframework/abp](https://github.com/abpframework/abp). Nothing else is installed on the host.
 
 ```powershell

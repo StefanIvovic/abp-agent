@@ -62,11 +62,8 @@ services:
     ports: ["11436:11434"]
     volumes:
       - ollama_data:/root/.ollama
-    deploy:                                   # GPU: nomic needs ~400 MB VRAM; if the LLM has filled
-      resources:                              # the card, Ollama falls back to CPU automatically
-        reservations:
-          devices:
-            - { driver: nvidia, count: all, capabilities: [gpu] }
+    # CPU on purpose: on the GPU these few hundred MB push the LLM over the card, and its prompt
+    # reading fell from about 1,100 to 48 tokens a second (D17)
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 5s

@@ -4,6 +4,7 @@ from fastapi import Depends, FastAPI
 from fastapi.responses import JSONResponse
 
 from abp_agent import __version__
+from abp_agent.agent.router import router as agent_router
 from abp_agent.config import Settings, get_settings
 from abp_agent.core.health import run_checks
 from abp_agent.graph.router import router as graph_router
@@ -18,6 +19,7 @@ app = FastAPI(
 
 app.include_router(retrieval_router)
 app.include_router(graph_router)
+app.include_router(agent_router)
 
 
 @app.get("/health/live", tags=["health"])

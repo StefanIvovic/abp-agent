@@ -168,6 +168,11 @@ QUERIES = {
 MODULE_RELATIONS = {"depends_on", "all_dependencies", "used_by", "all_used_by", "options"}
 
 
+def type_chunk(name: str) -> int | None:
+    rows = run("MATCH (t:Type {name: $name}) RETURN t.chunk_id AS id LIMIT 1", name=name)
+    return rows[0]["id"] if rows else None
+
+
 def relation(name: str, kind: str) -> dict:
     """One relation of one type: what the API, and later the agent's tool, read."""
     found, others = find(name, modules_only=kind in MODULE_RELATIONS)
