@@ -12,4 +12,7 @@
 | D8 | The test split is sealed by hash after human review | The earlier prototype changed test keys after seeing results. A change now has to be deliberate and visible |
 | D9 | Eval cases can carry chat history | The repeated-answer bug needed history, so single-turn cases couldn't catch it |
 | D10 | Agent model is qwen3.8-27b; the router uses JSON schema output | Measured before writing the agent. See `docs/model-trial.md`: JSON schema 75 of 75, forced tool call 70 of 75 |
+| D12 | Search docs and code separately, then alternate the results (`search_both`) | In one ranking docs win, because they share the question's plain English: c014's proof ranked 3rd in code alone and 31st mixed. Dev, 4 code cases, proof in the top 10: docs only 0, mixed 0, balanced 1, balanced with model-written search words 2 |
+| D13 | Parse C# with tree-sitter; chunk by type, then whole members; index split-up names | Text splitters cut code anywhere. BM25 keeps `AbpIdentityUserValidator` as one word, so "user validator" would miss it |
+| D14 | Stop tuning retrieval at 12 dev cases | Overall proof in the top 10 is 0.58 with model-written words, on one search. That's too few cases to tune on, and the agent can search again. Revisit with a reranker if agent evals point here |
 | D11 | Don't rely on the model to pick code over docs | Both 27B models searched the docs first on all 4 code-only cases. Phase 3 and 5 must make code reachable anyway, for example one search over both sources |

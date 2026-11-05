@@ -3,6 +3,7 @@
 from prefect import flow, get_run_logger, serve
 
 from abp_agent import __version__
+from abp_agent.pipelines.ingest import ingest
 
 
 @flow(name="platform-smoke-test", log_prints=True)
@@ -13,7 +14,10 @@ def smoke_test() -> str:
 
 
 def main() -> None:
-    serve(smoke_test.to_deployment(name="smoke-test", tags=["platform"]))
+    serve(
+        smoke_test.to_deployment(name="smoke-test", tags=["platform"]),
+        ingest.to_deployment(name="ingest", tags=["data"]),
+    )
 
 
 if __name__ == "__main__":

@@ -23,6 +23,20 @@ docker compose ps           # wait until everything is healthy
 | MLflow | http://localhost:5001 |
 | Neo4j Browser | http://localhost:7475 |
 
+## Data and search
+
+```powershell
+# Load the ABP docs and C# source (later runs skip unchanged files)
+docker compose exec pipelines prefect deployment run "ingest/ingest" --watch
+
+# Search: mode = bm25 | vector | hybrid, sources = docs, code (or try it at /docs)
+$body = '{"query": "user name uniqueness validator", "sources": ["code"], "limit": 5}'
+Invoke-RestMethod -Method Post http://localhost:8011/search -Body $body -ContentType application/json
+
+# Retrieval eval on dev questions, logged to MLflow experiment "retrieval"
+docker compose run --rm -v "${PWD}:/app" api python -m evals.retrieval_eval
+```
+
 ## Common commands
 
 ```powershell

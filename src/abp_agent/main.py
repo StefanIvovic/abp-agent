@@ -6,12 +6,16 @@ from fastapi.responses import JSONResponse
 from abp_agent import __version__
 from abp_agent.config import Settings, get_settings
 from abp_agent.core.health import run_checks
+from abp_agent.retrieval.router import router as retrieval_router
 
 app = FastAPI(
     title="ABP Agent",
     version=__version__,
     description="Answers ABP Framework questions from its docs and source code.",
 )
+
+
+app.include_router(retrieval_router)
 
 
 @app.get("/health/live", tags=["health"])

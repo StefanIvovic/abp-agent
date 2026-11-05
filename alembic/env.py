@@ -4,6 +4,7 @@ from sqlalchemy import create_engine, pool
 
 from abp_agent.config import get_settings
 from abp_agent.core.db import Base
+from abp_agent.documents import models  # noqa: F401  (registers the tables on Base.metadata)
 from alembic import context
 
 config = context.config

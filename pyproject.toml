@@ -14,6 +14,13 @@ dependencies = [
     "httpx>=0.27",
     "prefect>=3.4,<4",
     "streamlit>=1.40",
+    # Phase 3: sources and search
+    "llama-index-core>=0.14",
+    "llama-index-embeddings-ollama>=0.8",
+    "pgvector>=0.4",
+    "tree-sitter>=0.25",
+    "tree-sitter-c-sharp>=0.23",
+    "mlflow>=3.17,<3.18",           # same minor as the tracking server
 ]
 
 [dependency-groups]
