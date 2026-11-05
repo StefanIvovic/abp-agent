@@ -60,3 +60,4 @@ select = ["E", "W", "F", "I", "B", "C4", "UP"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/abp_agent/agent/assistant.py" = ["E501"]   # prompts read better unwrapped
+"src/abp_agent/agent/claims.py" = ["E501"]

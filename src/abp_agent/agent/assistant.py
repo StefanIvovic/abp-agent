@@ -24,6 +24,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
+from abp_agent.agent.claims import check_names, known_names
 from abp_agent.agent.guardrails import check_citations, check_input, strip_tool_markup
 from abp_agent.agent.llm import chat_model
 from abp_agent.agent.memory import get_checkpointer
@@ -214,12 +215,31 @@ def guard_output(state: AgentState) -> dict:
     if guard.get("route", "research") == "research" and not out.cited:
         guard["uncited_answer_replaced"] = True
         answer = NOT_FOUND
+    elif guard.get("route", "research") == "research":
+        names = unverified_names(answer, messages[_turn_start(messages)].content)
+        if names:
+            guard["unverified_names"] = names
+            answer = with_name_note(answer, names)
     update: dict = {"citations": [retrieved[i] for i in out.cited], "guard": guard}
     if answer != final.content:
         # Same id: the add_messages reducer replaces the message instead of appending.
         update["messages"] = [AIMessage(answer, id=final.id,
                                         response_metadata=final.response_metadata)]
     return update
+
+
+def unverified_names(answer: str, question: str) -> list[str]:
+    """Never fails a turn: without the name list the answer just goes out unchecked."""
+    try:
+        return check_names(answer, question, known_names())
+    except Exception:  # noqa: BLE001
+        log.warning("name check failed", exc_info=True)
+        return []
+
+
+def with_name_note(answer: str, names: list[str]) -> str:
+    listed = ", ".join(f"`{n}`" for n in names)
+    return f"{answer}\n\n> Not found in ABP's docs or source, so treat as unverified: {listed}"
 
 
 def _after_input(state: AgentState) -> str:

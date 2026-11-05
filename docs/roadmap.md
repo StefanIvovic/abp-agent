@@ -12,7 +12,7 @@ makes judgment calls, code enforces what must always hold.
 | 3. Sources | Ingest docs, and C# by class and method, with hybrid search | Retrieval eval beats docs-only on code questions |
 | 4. Graph | Modules, options, interfaces and implementations, and doc pages to classes; parsed, no LLM | Closed-list eval passes |
 | 5. Agent | One LangGraph agent, constrained router, code-side routing where the question type is clear | Agent eval runs, pass^3 reported |
-| 6. Guards | Answers held until the output guard passes; claim check on "why" answers | Unit test: a replaced draft never reaches the client |
+| 6. Guards | Answers held until the output guard passes; every code name checked against ABP; claim check as a review aid | Unit test: a replaced draft never reaches the client |
 | 7. Monitoring | MLflow traces with decision tags, feedback, failures become eval cases | The full loop can be demoed |
 | 8. MCP and CI | Read tools over MCP, with auth; tests and lint in CI | A client connects; CI runs on each push |
 

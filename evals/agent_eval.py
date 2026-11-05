@@ -21,6 +21,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from abp_agent.agent import service
 from abp_agent.agent.assistant import NOT_FOUND, get_graph
+from abp_agent.agent.claims import check_claims
 from abp_agent.config import get_settings
 from evals.schema import RESEARCH, Case
 from evals.verify import SPLITS, load, squeeze
@@ -79,7 +80,17 @@ def check(case: Case, turn: dict, chunks: list[dict]) -> dict:
     return checks
 
 
-def run_case(case: Case) -> dict:
+def suspects(case: Case, turn: dict) -> list[str]:
+    """Claims to read: noisy, so never part of a pass (D23)."""
+    if not turn["citations"]:
+        return []
+    try:
+        return check_claims(case.question, turn["answer"], turn["citations"])
+    except Exception as e:  # noqa: BLE001 - a review aid must not stop the run
+        return [f"(claim check failed: {type(e).__name__})"]
+
+
+def run_case(case: Case, claims: bool = False) -> dict:
     turn = service.run_turn(case.question, history=history_messages(case))
     chunks = retrieved(turn["thread_id"])
     checks = check(case, turn, chunks)
@@ -88,6 +99,8 @@ def run_case(case: Case) -> dict:
             "must_not_say": case.must_not_say, "answer": turn["answer"], "steps": turn["steps"],
             "cited": [c["url"] for c in turn["citations"]], "route": turn["guard"].get("route"),
             "proof_found": proof_found(case, chunks), "checks": checks,
+            "unverified_names": turn["guard"].get("unverified_names", []),
+            "suspects": suspects(case, turn) if claims else [],
             "passed": all(checks.values()), "seconds": turn["latency_ms"] / 1000}
 
 
@@ -97,6 +110,7 @@ def main() -> None:
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--cases", help="comma-separated ids")
     ap.add_argument("--name", default="dev")
+    ap.add_argument("--claims", action="store_true", help="list suspect claims for a reader")
     args = ap.parse_args()
     cases = load(SPLITS[args.split])
     if args.cases:
@@ -105,7 +119,7 @@ def main() -> None:
     for repeat in range(args.repeats):
         for c in cases:
             try:
-                row = run_case(c)
+                row = run_case(c, args.claims)
             except RuntimeError as e:
                 row = {"id": c.id, "kind": c.kind, "question": c.question, "passed": False,
                        "error": str(e)[:300], "seconds": 0.0, "checks": {}, "answer": None}
@@ -126,6 +140,7 @@ def main() -> None:
         if research else None,
         "p50_seconds": round(statistics.median(seconds), 1) if seconds else None,
         "tools_per_run": round(statistics.mean(len(r.get("steps", [])) for r in rows), 2),
+        "runs_with_unverified_names": sum(bool(r.get("unverified_names")) for r in rows),
     }
     RESULTS.mkdir(exist_ok=True)
     (RESULTS / f"agent-{args.name}.json").write_text(

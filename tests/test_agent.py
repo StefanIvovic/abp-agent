@@ -1,7 +1,7 @@
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from abp_agent.agent import assistant, service, tools
+from abp_agent.agent import assistant, claims, service, tools
 from evals import agent_eval
 from evals.schema import Case
 
@@ -182,3 +182,38 @@ def test_abstain_detection_reads_through_markdown():
 
 def test_abstain_detection_accepts_a_plain_no():
     assert agent_eval.abstained("ABP does not ship a Redis Streams provider.")
+
+
+def test_names_that_exist_nowhere_are_flagged_and_real_ones_are_not():
+    known = {"IEmailSender", "SmtpEmailSender"}
+    answer = "Use `IEmailSender` or `SignInResult.NotConfirmed` with `AbpConfigurationOptions`."
+    assert claims.check_names(answer, "a question", known) == ["AbpConfigurationOptions",
+                                                               "NotConfirmed", "SignInResult"]
+
+
+def test_names_from_the_question_and_example_code_are_not_claims():
+    answer = "Rename `MyBookService`.\n```csharp\npublic class MyBookService { }\n```\n`YourThing`"
+    assert claims.check_names(answer, "What about YourThing?", set()) == []
+
+
+def test_only_inline_code_is_read():
+    assert claims.code_names("MailMessage in prose\n```\nFakeThing x;\n```") == set()
+
+
+def test_claims_are_read_from_the_schema():
+    assert claims.read_claims('{"unsupported": ["A", " "]}') == ["A"]
+
+
+def test_an_unverified_name_is_shown_to_the_reader(monkeypatch):
+    monkeypatch.setattr(assistant, "known_names", lambda: frozenset({"RealThing"}))
+    answer = AIMessage("Use `FakeThing` [7].", id="a")
+    out = assistant.guard_output(state("research", HumanMessage("q"), *tool_turn(7), answer))
+    assert out["guard"]["unverified_names"] == ["FakeThing"]
+    assert "treat as unverified: `FakeThing`" in out["messages"][0].content
+
+
+def test_a_broken_name_list_never_fails_a_turn(monkeypatch):
+    def boom():
+        raise ConnectionError("down")
+    monkeypatch.setattr(assistant, "known_names", boom)
+    assert assistant.unverified_names("Use `FakeThing`.", "q") == []
