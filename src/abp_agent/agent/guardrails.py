@@ -2,7 +2,7 @@
 
 - Input: length limit and obvious prompt-injection phrases. Topic control is left to the
   system prompt; a keyword topic filter would block legitimate questions.
-- Output: every [chunk_id] the answer cites must come from a tool result of this turn.
+- Output: every [chunk_id] the answer cites must come from a tool result the model can still see.
   Invented ids are removed and counted, so the eval and the traces can measure it.
 """
 
@@ -19,6 +19,7 @@ _INJECTION = re.compile(
     re.IGNORECASE,
 )
 _CITATION = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
+_CODE = re.compile(r"(`{3,}).*?(?:\1`*|\Z)|`[^`\n]+`", re.DOTALL)   # a fence, or inline code
 # Tool-call syntax the model leaves after its answer. Only at the very end: the same tags can be
 # legitimate inside an answer's code sample.
 _TRAILING_TOOL_MARKUP = re.compile(r"(?:\s*</?(?:parameter|function|tool_call)\b[^>\n]*>)+\s*\Z")
@@ -60,17 +61,36 @@ class OutputCheck:
 
 def check_citations(answer: str, retrieved: set[int]) -> OutputCheck:
     """Keep citations of retrieved chunks; drop the rest. "[12, 99]" keeps "[12]" if 99 is
-    invented. Answers without any citation are allowed (e.g. "I don't know")."""
+    invented. Answers without any citation are allowed (e.g. "I don't know").
+
+    Code is never changed: `data[0]` is an index, not a citation, and spacing matters there. A real
+    id in code, such as a `// [123]` comment, still counts as cited. An invented one stays in the
+    code uncounted, because it can't be told from an index."""
     out = OutputCheck(answer)
 
+    def ids_in(m: re.Match) -> list[int]:
+        return [int(x) for x in re.split(r"\s*,\s*", m.group(1))]
+
+    def cite(ids: list[int]) -> None:
+        out.cited += [i for i in dict.fromkeys(ids) if i not in out.cited]
+
     def fix(m: re.Match) -> str:
-        ids = [int(x) for x in re.split(r"\s*,\s*", m.group(1))]
+        ids = ids_in(m)
         keep = [i for i in ids if i in retrieved]
         out.removed += [i for i in ids if i not in retrieved]
-        for i in keep:
-            if i not in out.cited:
-                out.cited.append(i)
+        cite(keep)
         return f"[{', '.join(map(str, keep))}]" if keep else ""
 
-    out.answer = re.sub(r"[ \t]+([.,;:])", r"\1", _CITATION.sub(fix, answer)).strip()
+    def prose(text: str) -> str:
+        return re.sub(r"[ \t]+([.,;:])", r"\1", _CITATION.sub(fix, text))
+
+    parts, at = [], 0
+    for code in _CODE.finditer(answer):
+        parts.append(prose(answer[at:code.start()]))
+        for m in _CITATION.finditer(code.group()):
+            cite([i for i in ids_in(m) if i in retrieved])
+        parts.append(code.group())
+        at = code.end()
+    parts.append(prose(answer[at:]))
+    out.answer = "".join(parts).strip()
     return out

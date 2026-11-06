@@ -456,3 +456,47 @@ def test_no_abp_name_leaves_the_platform_to_the_model(monkeypatch):
     use(monkeypatch, AIMessage('{"technology": "csharp", "platform": "server", "intent": "why"}'))
     out = assistant.analyze_query({"messages": [HumanMessage("Why does this fail?")], "guard": {}})
     assert out["guard"]["analysis"]["platform"] == "server"
+
+
+def test_an_array_index_in_code_is_not_a_citation():
+    from abp_agent.agent.guardrails import check_citations
+    answer = "Fetch it [7].\n\n```js\n// data[0].resources -> English\nvar x = data[1];\n```"
+    out = check_citations(answer, {7})
+    assert out.answer == answer
+    assert out.removed == [] and out.cited == [7]
+
+
+def test_inline_code_is_left_alone():
+    from abp_agent.agent.guardrails import check_citations
+    out = check_citations("Read `items[0]` first [7].", {7})
+    assert out.answer == "Read `items[0]` first [7]."
+    assert out.removed == []
+
+
+def test_code_keeps_its_spacing():
+    from abp_agent.agent.guardrails import check_citations
+    code = ("```csharp\npublic class A : B\n{\n    var x = c ? d : e;\n}\n```\n\n"
+            "```js\nfetch(url)\n      .then(r => r.json());\n```")
+    out = check_citations(f"See this [7].\n\n{code}", {7})
+    assert code in out.answer
+
+
+def test_a_real_citation_in_a_code_comment_still_counts():
+    from abp_agent.agent.guardrails import check_citations
+    answer = "```js\nabp.a = 1; // [7]\n```"
+    out = check_citations(answer, {7})
+    assert out.cited == [7] and out.answer == answer
+
+
+def test_an_unclosed_fence_is_still_code():
+    from abp_agent.agent.guardrails import check_citations
+    answer = "See [7].\n\n```js\nvar x = a[0];"
+    out = check_citations(answer, {7})
+    assert out.answer == answer and out.removed == []
+
+
+def test_prose_is_cleaned_as_before_around_code():
+    from abp_agent.agent.guardrails import check_citations
+    out = check_citations("Use `a[0]` [99]. Real [7] , and fake [12, 7].", {7})
+    assert out.answer == "Use `a[0]`. Real [7], and fake [7]."
+    assert out.removed == [99, 12] and out.cited == [7]
