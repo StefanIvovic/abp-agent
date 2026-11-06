@@ -16,11 +16,12 @@ from sqlalchemy.orm import Session
 from abp_agent.core.embeddings import embed_query
 
 Mode = Literal["bm25", "vector", "hybrid"]
+CODE_SOURCES = ["code", "js"]    # C# and JavaScript share the code half of a search
 
 
 @dataclass
 class SearchFilters:
-    sources: list[str] | None = None       # docs, code; None = both
+    sources: list[str] | None = None       # docs, code, js; None = all
     categories: list[str] | None = None    # framework, or a module
 
 
@@ -154,5 +155,6 @@ def search_both(db: Session, query: str, limit: int = 10) -> list[SearchHit]:
     vector = embed_query(query)
     half = (limit + 1) // 2
     docs = search(db, query, limit=half, filters=SearchFilters(["docs"]), query_vector=vector).hits
-    code = search(db, query, limit=half, filters=SearchFilters(["code"]), query_vector=vector).hits
+    code = search(db, query, limit=half, filters=SearchFilters(CODE_SOURCES),
+                  query_vector=vector).hits
     return interleave(docs, code)[:limit]

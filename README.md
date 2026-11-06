@@ -26,7 +26,7 @@ docker compose ps           # wait until everything is healthy
 ## Data and search
 
 ```powershell
-# Load the ABP docs and C# source (later runs skip unchanged files)
+# Load the ABP docs, C# and JavaScript (later runs skip unchanged files)
 docker compose exec pipelines prefect deployment run "ingest/ingest" --watch
 
 # Search: mode = bm25 | vector | hybrid, sources = docs, code (or try it at /docs)

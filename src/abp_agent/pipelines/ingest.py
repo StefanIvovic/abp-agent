@@ -1,4 +1,4 @@
-"""Prefect flow: ABP's docs and C# source -> chunks -> embeddings -> Postgres.
+"""Prefect flow: ABP's docs, C# and JavaScript -> chunks -> embeddings -> Postgres.
 
 Incremental: a file is re-ingested only if its content or the pipeline version changed, and files
 deleted from the repo are removed.
@@ -17,7 +17,7 @@ from abp_agent.core.db import get_engine, new_session
 from abp_agent.core.embeddings import embed_documents
 from abp_agent.documents import service
 from abp_agent.documents.chunking import TextChunk, chunk_markdown, markdown_config
-from abp_agent.sources import csharp
+from abp_agent.sources import csharp, javascript
 from abp_agent.sources.markdown_docs import (
     DocsRepoConfig,
     list_pages,
@@ -69,6 +69,15 @@ def code_items(root: Path, commit: str) -> tuple[str, list[Item]]:
         for f in files if f.types]
 
 
+def js_items(root: Path, commit: str) -> tuple[str, list[Item]]:
+    files = [javascript.parse_file(root, f, commit) for f in javascript.list_files(root)]
+    return javascript.PARSER_VERSION, [
+        Item(service.DocumentIn("js", f.path, f.title, f.url, f.content_hash, f.category,
+                                {"commit": commit}),
+             lambda f=f: javascript.chunk_file(f))
+        for f in files if f.groups]
+
+
 @task(cache_policy=NO_CACHE, task_run_name="load-{source}-{n}")
 def load_batch(source: str, items: list[Item], version: str, n: int) -> int:
     per_file = [item.chunk() for item in items]
@@ -112,7 +121,7 @@ def ingest(sources: list[str] | None = None, force: bool = False,
     deleted files is skipped then). `force` rebuilds unchanged files too."""
     root = Path(get_settings().abp_repo_dir)
     commit = repo_commit(root) or "unknown"
-    builders = {"docs": docs_items, "code": code_items}
+    builders = {"docs": docs_items, "code": code_items, "js": js_items}
     result = {s: ingest_source(s, builders[s], root, commit, force, limit)
               for s in sources or list(builders)}
     if any(r["ingested"] or r["removed"] for r in result.values()):

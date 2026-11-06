@@ -45,7 +45,7 @@ def passages(hits: list[SearchHit]) -> tuple[str, list[dict]]:
 
 @tool(response_format="content_and_artifact")
 def search(query: str) -> tuple[str, list[dict]]:
-    """Search ABP's documentation and C# source code together.
+    """Search ABP's documentation, C# source and JavaScript source together.
 
     Args:
         query: what to look for. Use ABP class, interface, option and module names when you know

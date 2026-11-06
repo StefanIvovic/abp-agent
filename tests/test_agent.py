@@ -416,3 +416,43 @@ def test_an_abp_name_means_javascript_even_if_the_model_says_otherwise(monkeypat
     out = assistant.analyze_query({"messages": [HumanMessage("Use abp.ajax in my Razor Page")],
                                    "guard": {}})
     assert out["guard"]["analysis"]["technology"] == "javascript"
+
+
+@pytest.mark.parametrize("model_says", ["angular", "server", "unknown"])
+def test_an_abp_name_is_mvc_unless_another_ui_is_named(monkeypatch, model_says):
+    use(monkeypatch, AIMessage(
+        f'{{"technology": "javascript", "platform": "{model_says}", "intent": "why"}}'))
+    out = assistant.analyze_query({"messages": [HumanMessage("Does abp.auth.isGranted call out?")],
+                                   "guard": {}})
+    assert out["guard"]["analysis"]["platform"] == "mvc"
+
+
+@pytest.mark.parametrize(("message", "platform"), [
+    ("Can I use abp.auth.isGranted in Angular?", "angular"),
+    ("Does abp.auth.isGranted work in my BLAZOR app?", "blazor")])
+def test_a_named_ui_keeps_the_models_platform(monkeypatch, message, platform):
+    use(monkeypatch, AIMessage(
+        f'{{"technology": "javascript", "platform": "{platform}", "intent": "why"}}'))
+    out = assistant.analyze_query({"messages": [HumanMessage(message)], "guard": {}})
+    assert out["guard"]["analysis"]["platform"] == platform
+
+
+def test_a_ui_named_earlier_in_the_chat_counts(monkeypatch):
+    use(monkeypatch, AIMessage(
+        '{"technology": "javascript", "platform": "angular", "intent": "why"}'))
+    messages = [HumanMessage("I work on an Angular app."), AIMessage("Fine."),
+                HumanMessage("Does abp.auth.isGranted call out?")]
+    out = assistant.analyze_query({"messages": messages, "guard": {}})
+    assert out["guard"]["analysis"]["platform"] == "angular"
+
+
+def test_a_failed_analysis_still_applies_the_abp_rules(monkeypatch):
+    use(monkeypatch, RuntimeError("down"))
+    out = assistant.analyze_query({"messages": [HumanMessage("Use abp.ajax here")], "guard": {}})
+    assert out["guard"]["analysis"]["platform"] == "mvc"
+
+
+def test_no_abp_name_leaves_the_platform_to_the_model(monkeypatch):
+    use(monkeypatch, AIMessage('{"technology": "csharp", "platform": "server", "intent": "why"}'))
+    out = assistant.analyze_query({"messages": [HumanMessage("Why does this fail?")], "guard": {}})
+    assert out["guard"]["analysis"]["platform"] == "server"

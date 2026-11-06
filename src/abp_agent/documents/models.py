@@ -1,4 +1,4 @@
-"""Database tables: a document (a docs page or a C# file) and its chunks.
+"""Database tables: a document (a docs page, or a C# or JavaScript file) and its chunks.
 
     document 1──* chunk
 """
@@ -28,7 +28,7 @@ class Document(Base):
     __table_args__ = (UniqueConstraint("source", "path"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source: Mapped[str] = mapped_column(String(16))     # docs, code
+    source: Mapped[str] = mapped_column(String(16))     # docs, code, js
     path: Mapped[str] = mapped_column(String(512))      # within docs/en, or within the repo
     title: Mapped[str] = mapped_column(Text)
     url: Mapped[str] = mapped_column(Text)              # where a citation links to

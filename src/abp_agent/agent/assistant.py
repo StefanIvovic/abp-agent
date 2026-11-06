@@ -57,7 +57,7 @@ FIXED_REPLY = {
 SYSTEM_PROMPT = """You are a developer assistant for the ABP Framework (abp.io), an open-source application framework for ASP.NET Core. You answer from ABP's documentation and source code.
 
 Tools:
-- search: ABP's docs and C# source together. Search with ABP class, interface, option and module names when you know them, not the user's whole sentence. Search again with different words if the results don't answer the question.
+- search: ABP's docs, C# source and JavaScript source together. Search with ABP class, interface, option and module names when you know them, not the user's whole sentence. Search again with different words if the results don't answer the question.
 - code_graph: exact lists from the source. Use it for "which" and "list" questions: what depends on a module, what implements an interface, which options a module has.
 
 Technology and API identification:
@@ -118,6 +118,7 @@ BUDGET_NUDGE = ("Search budget reached. Answer my question now using only the pa
 
 _PASSAGE = re.compile(r"(?m)^(?=\[\d+\] )")   # where each "[chunk_id] title" starts in a result
 _TEXT_TOOL_CALL = re.compile(r"<tool_call>|<function=")
+_OTHER_UI = re.compile(r"\b(?:angular|blazor)\b", re.IGNORECASE)
 
 
 class AgentState(MessagesState):
@@ -202,8 +203,9 @@ def read_analysis(content: str) -> dict:
 
 def analyze_query(state: AgentState) -> dict:
     """What a search should aim at. Only ever a hint: a failure costs the hint, not the turn, and
-    is recorded. An abp.* name is JavaScript whatever page it's on, so code decides that: the model
-    read "abp.ajax in a Razor Page" as razor."""
+    is recorded. An abp.* name is JavaScript whatever page it's on, and MVC unless the user names
+    another UI, so code decides both: the model read "abp.ajax in a Razor Page" as razor, and
+    guessed Angular for abp.auth.isGranted, which sent the searches the wrong way."""
     guard = dict(state.get("guard", {}))
     latest = state["messages"][-1].content
     names = identifiers(latest if isinstance(latest, str) else str(latest))
@@ -217,6 +219,10 @@ def analyze_query(state: AgentState) -> dict:
         guard["analysis_failed"] = True
     if any(n.startswith("abp.") for n in names):
         analysis["technology"] = "javascript"
+        asked = " ".join(str(m.content) for m in _dialogue(state["messages"])
+                         if isinstance(m, HumanMessage))
+        if not _OTHER_UI.search(asked):
+            analysis["platform"] = "mvc"
     return {"guard": {**guard, "analysis": analysis}}
 
 
