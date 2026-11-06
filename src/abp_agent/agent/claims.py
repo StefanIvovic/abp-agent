@@ -3,6 +3,8 @@ what the sentence says, so these read the answer itself:
 
 - check_names: every code name an answer claims must exist somewhere in ABP. Plain code, no LLM,
   almost free. Runs on live answers.
+- unseen_calls: calls in code samples must appear in what was retrieved this turn. Plain code too,
+  and runs on live answers.
 - check_claims: one LLM call compares the answer with the passages it cites. It finds real
   problems but flagged 59 of 92 answers, many wrongly, so it only lists suspects in evals (D23).
 """
@@ -20,7 +22,7 @@ from abp_agent.core.db import new_session
 
 log = logging.getLogger(__name__)
 
-_IDENTIFIER = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]{3,}\b")
+IDENTIFIER = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]{3,}\b")
 _FENCE = re.compile(r"```.*?```", re.DOTALL)
 _INLINE = re.compile(r"`([^`\n]+)`")
 _TYPE_NAME = re.compile(r"\b(?:[A-Z][a-z0-9]+){2,}[A-Za-z0-9]*\b|\bI[A-Z][a-z]+[A-Za-z0-9]*\b")
@@ -31,6 +33,17 @@ _DENIAL = re.compile(r"no such|found nothing|(?:doesn't|does not) exist|there(?:
                      r"|no built-in|(?:couldn't|could not) find|none of (?:those|these)|\bno `"
                      r"|not from `|(?:can't|cannot) (?:show|confirm|point)|(?:don't|do not) have",
                      re.I)
+_SAMPLE = re.compile(r"```([\w#+-]*)[ \t]*\n(.*?)```", re.DOTALL)
+_CSHARP = {"csharp", "cs", "c#", ""}
+_CALL = re.compile(r"(?:^|[^\w])([A-Z]\w{3,})\s*(?:<[^<>()]*>)?\s*\(", re.MULTILINE)
+# A method the sample itself defines: a type before the name, unlike "await Foo(" or "new Foo("
+_SAMPLE_DECLARES = re.compile(r"\b(?!await\b|return\b|new\b|throw\b|typeof\b|nameof\b)"
+                              r"[\w<>\[\]?,.]+\s+([A-Z]\w+)\s*(?:<[^<>()]*>)?\s*\(")
+# Everyday .NET and DI calls a sample may use without a source showing them
+COMMON_CALLS = frozenset({
+    "AddScoped", "AddSingleton", "AddTransient", "Clear", "Configure", "Contains", "FromResult",
+    "Insert", "MailAddress", "RemoveAll", "Replace", "Scoped", "Single", "Singleton",
+    "ToDictionary", "Transient"})
 _QUOTED = re.compile(r"\"[^\"]*\"")     # a string in a sample is the reader's value, not an API
 _PLACEHOLDER = re.compile(r"(?:My|Your|Sample|Example)[A-Z]")   # the reader's names, not ABP's
 _DOTNET_NAMESPACE = ("System.", "Microsoft.")
@@ -51,7 +64,7 @@ def known_names() -> frozenset[str]:
     names: set[str] = set()
     with new_session() as db:
         for (body,) in db.execute(text("SELECT text FROM chunk")):
-            names.update(_IDENTIFIER.findall(body))
+            names.update(IDENTIFIER.findall(body))
     return frozenset(names)
 
 
@@ -72,7 +85,19 @@ def code_names(answer: str) -> set[str]:
 
 def check_names(answer: str, question: str, known: frozenset[str] | set[str]) -> list[str]:
     """Names in the answer that exist nowhere in ABP and weren't in the question."""
-    return sorted(code_names(answer) - set(known) - set(_IDENTIFIER.findall(question)))
+    return sorted(code_names(answer) - set(known) - set(IDENTIFIER.findall(question)))
+
+
+def unseen_calls(answer: str, seen: set[str]) -> list[str]:
+    """Calls in C# samples that nothing retrieved this turn shows, so the model wrote them from
+    memory. Whether a call exists somewhere isn't enough: ReplaceService does, on another type,
+    and checking all of ABP found one real problem in 193 samples (D26)."""
+    calls: set[str] = set()
+    for language, code in _SAMPLE.findall(answer):
+        if language.lower() in _CSHARP:
+            calls |= set(_CALL.findall(code)) - set(_SAMPLE_DECLARES.findall(code))
+            calls -= set(_DECLARED.findall(code))
+    return sorted(c for c in calls - seen - COMMON_CALLS if not _PLACEHOLDER.match(c))
 
 
 def read_claims(content: str) -> list[str]:

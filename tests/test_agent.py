@@ -268,3 +268,34 @@ def test_names_that_are_not_claims_about_abp_get_no_warning(answer):
 def test_a_denial_only_covers_its_own_sentence():
     answer = "There is no `AbpSoapModule`. Use `AbpSoapOptions` instead."
     assert claims.check_names(answer, "q", set()) == ["AbpSoapOptions"]
+
+
+SAMPLE = ("Do this:\n```csharp\npublic class My : Base\n{\n    public void Run()\n    {\n"
+          "{body}\n    }\n}\n```")
+
+
+def sample(body: str) -> str:
+    return SAMPLE.replace("{body}", body)
+
+
+def test_a_call_no_source_showed_is_found():
+    answer = sample("        ReplaceService<IA, B>();\n        settingProvider.SetAsync(x);")
+    assert claims.unseen_calls(answer, {"ICalc"}) == ["ReplaceService", "SetAsync"]
+
+
+def test_seen_common_and_own_calls_are_not_flagged():
+    answer = sample("        Helper.GetAsync();\n        list.Clear();\n        Run();\n"
+                    "        new My();\n        new MyThing();")
+    assert claims.unseen_calls(answer, {"GetAsync"}) == []
+
+
+def test_samples_in_other_languages_are_left_alone():
+    assert claims.unseen_calls("```js\nConfigState.GetOne();\n```", set()) == []
+
+
+def test_an_unseen_call_is_shown_to_the_reader(monkeypatch):
+    monkeypatch.setattr(assistant, "known_names", lambda: frozenset())
+    answer = AIMessage("Use this [7].\n```csharp\nFakeCall();\n```", id="a")
+    out = assistant.guard_output(state("research", HumanMessage("q"), *tool_turn(7), answer))
+    assert out["guard"]["unseen_calls"] == ["FakeCall"]
+    assert "check it first: `FakeCall`" in out["messages"][0].content

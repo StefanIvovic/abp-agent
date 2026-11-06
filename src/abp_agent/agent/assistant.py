@@ -24,7 +24,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
-from abp_agent.agent.claims import check_names, known_names
+from abp_agent.agent.claims import IDENTIFIER, check_names, known_names, unseen_calls
 from abp_agent.agent.guardrails import check_citations, check_input, strip_tool_markup
 from abp_agent.agent.llm import chat_model
 from abp_agent.agent.memory import get_checkpointer
@@ -215,10 +215,16 @@ def guard_output(state: AgentState) -> dict:
         guard["uncited_answer_replaced"] = True
         answer = NOT_FOUND
     else:
-        names = unverified_names(answer, messages[_turn_start(messages)].content)
+        question = messages[_turn_start(messages)].content
+        names = unverified_names(answer, question)
+        seen = {n for c in retrieved.values() for n in IDENTIFIER.findall(c.get("text", ""))}
+        calls = unseen_calls(answer, seen | set(IDENTIFIER.findall(question)))
         if names:
             guard["unverified_names"] = names
             answer = with_name_note(answer, names)
+        if calls:
+            guard["unseen_calls"] = calls
+            answer = with_call_note(answer, calls)
     update: dict = {"citations": [retrieved[i] for i in out.cited], "guard": guard}
     if answer != final.content:
         # Same id: the add_messages reducer replaces the message instead of appending.
@@ -239,6 +245,11 @@ def unverified_names(answer: str, question: str) -> list[str]:
 def with_name_note(answer: str, names: list[str]) -> str:
     listed = ", ".join(f"`{n}`" for n in names)
     return f"{answer}\n\n> Not found in ABP's docs or source, so treat as unverified: {listed}"
+
+
+def with_call_note(answer: str, calls: list[str]) -> str:
+    listed = ", ".join(f"`{c}`" for c in calls)
+    return f"{answer}\n\n> Not in the sources behind this answer, so check it first: {listed}"
 
 
 def _after_input(state: AgentState) -> str:

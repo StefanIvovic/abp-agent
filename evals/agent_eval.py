@@ -116,6 +116,7 @@ def run_case(case: Case, claims: bool = False) -> dict:
             "cited": [c["url"] for c in turn["citations"]], "route": turn["guard"].get("route"),
             "proof_found": proof_found(case, chunks), "checks": checks,
             "unverified_names": turn["guard"].get("unverified_names", []),
+            "unseen_calls": turn["guard"].get("unseen_calls", []),
             "suspects": suspects(case, turn) if claims else [],
             "passed": all(checks.values()), "seconds": turn["latency_ms"] / 1000}
 
@@ -157,6 +158,7 @@ def main() -> None:
         "p50_seconds": round(statistics.median(seconds), 1) if seconds else None,
         "tools_per_run": round(statistics.mean(len(r.get("steps", [])) for r in rows), 2),
         "runs_with_unverified_names": sum(bool(r.get("unverified_names")) for r in rows),
+        "runs_with_unseen_calls": sum(bool(r.get("unseen_calls")) for r in rows),
     }
     RESULTS.mkdir(exist_ok=True)
     (RESULTS / f"agent-{args.name}.json").write_text(
