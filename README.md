@@ -47,6 +47,31 @@ Invoke-RestMethod "http://localhost:8011/graph/relation?name=IEmailSender&kind=i
 docker compose run --rm -v "${PWD}:/app" api python -m evals.graph_eval
 ```
 
+## Monitoring
+
+Every chat turn is one trace in MLflow: http://localhost:5001/#/experiments/4/traces (experiment
+`agent`). Eval traces go to `agent-eval`, so the two never mix.
+
+| Question | Where |
+|---|---|
+| Volume, latency, errors, tokens | Overview |
+| Which questions, slow or failed ones | Traces |
+| Why an answer came out as it did | Open a trace: every step, passage and model call |
+| Whole conversations | Sessions |
+| Ratings and comments | Open a trace: Assessments |
+
+Filter traces by tag: `route`, `answer_replaced`, `citations_removed`, `unverified_names`,
+`unseen_calls`, `first_call_retried`, `router_failed`, `input_blocked`, `invalid_tools`,
+`tool_rounds`, `tool_calls`, `citations`, `environment`, `status`, plus `model`, `prompt_version`
+and `app_version`.
+
+Rate answers with the thumbs on the chat page, or `POST /feedback`. A thumbs down asks what was
+wrong. Then collect what's worth an eval case:
+
+```powershell
+docker compose run --rm -v "${PWD}:/app" api python -m evals.candidates
+```
+
 ## Common commands
 
 ```powershell

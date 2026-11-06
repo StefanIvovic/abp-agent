@@ -35,10 +35,39 @@ def events(message: str):
                 yield json.loads(line[6:])
 
 
-for m in ss.messages:
+def send_rating(trace_id: str, thumbs_up: bool, comment: str | None = None) -> None:
+    try:
+        httpx.post(f"{API}/feedback", timeout=30, json={
+            "trace_id": trace_id, "thumbs_up": thumbs_up, "comment": comment}).raise_for_status()
+        st.toast("Thanks, saved")
+    except httpx.HTTPError as e:
+        st.toast(f"Could not save that: {e}")
+
+
+def rate(trace_id: str, key: str) -> None:
+    if ss.get(key) is not None:
+        send_rating(trace_id, bool(ss[key]))
+
+
+def comment(trace_id: str, key: str) -> None:
+    if ss.get(key):
+        send_rating(trace_id, False, ss[key])
+
+
+def show_rating(i: int, m: dict) -> None:
+    rating = f"rating_{i}"
+    st.feedback("thumbs", key=rating, on_change=rate, args=(m["trace_id"], rating))
+    if ss.get(rating) == 0:
+        note = f"comment_{i}"
+        st.text_input("What was wrong?", key=note, on_change=comment, args=(m["trace_id"], note))
+
+
+for i, m in enumerate(ss.messages):
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
         show_sources(m.get("citations", []))
+        if m.get("trace_id"):
+            show_rating(i, m)
 
 if question := st.chat_input("Ask about ABP"):
     ss.messages.append({"role": "user", "content": question})
@@ -61,5 +90,5 @@ if question := st.chat_input("Ask about ABP"):
             elif ev["type"] == "done":
                 status.update(label=f"Done in {ev['latency_ms'] / 1000:.1f} s", state="complete")
                 ss.messages.append({"role": "assistant", "content": ev["answer"],
-                                    "citations": ev["citations"]})
+                                    "citations": ev["citations"], "trace_id": ev["trace_id"]})
                 st.rerun()

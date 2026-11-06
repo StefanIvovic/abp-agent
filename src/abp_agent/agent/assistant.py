@@ -194,11 +194,14 @@ def agent(state: AgentState) -> dict:
     system = SystemMessage(f"{SYSTEM_PROMPT}\n\nFor this turn: {extra}" if extra else SYSTEM_PROMPT)
     sent = [system, *_history(messages), *nudge]
     reply = model.invoke(sent)
+    update: dict = {}
     # LM Studio doesn't enforce a required tool call, so the model can skip it (D28)
     if _is_text_tool_call(reply) or (rounds == 0 and not reply.tool_calls):
         log.warning("no tool call where one was needed; retrying once, then the guard decides")
         reply = model.invoke(sent)
-    return {"messages": [reply]}
+        if rounds == 0:
+            update["guard"] = {**state.get("guard", {}), "first_call_retried": True}
+    return {"messages": [reply], **update}
 
 
 def reply(state: AgentState) -> dict:

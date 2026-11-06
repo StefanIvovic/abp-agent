@@ -19,6 +19,18 @@ docker compose run --rm -v "${PWD}:/app" api python -m evals.verify --seal   # f
 - **Forum text is paraphrased** and linked. No usernames or emails, no copied answers, and it's
   used for testing only, not training (abp.io allows reference use, not AI training).
 
+## From a failure to a case
+
+1. `python -m evals.candidates` adds live turns to `results/candidates.jsonl`: thumbs down first,
+   then turns the guards acted on. It keeps the question, chat history, answer, comments and trace
+   id, and running it again adds only new turns.
+2. Open the trace and find out what went wrong.
+3. Write the key from the docs and source, with evidence quotes, and add the case to `dev.jsonl`
+   with `status: reviewed`. A comment or rating is a lead, not a key.
+4. Run `python -m evals.verify`, then the case with `python -m evals.agent_eval --cases <id>`.
+
+Step 1 is automatic. Steps 2 and 3 stay with a person, because a key has to be proved.
+
 ## How forum questions are chosen
 
 1. Take threads from `https://abp.io/sitemap-support.xml` last changed since 2024-11, leaving out

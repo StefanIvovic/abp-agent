@@ -24,11 +24,12 @@ from langchain_core.messages import AIMessage, HumanMessage
 from abp_agent.agent import service
 from abp_agent.agent.assistant import NOT_FOUND, get_graph
 from abp_agent.agent.claims import check_claims
-from abp_agent.config import get_settings
+from abp_agent.core.observability import setup_tracing
 from evals.schema import RESEARCH, Case
 from evals.verify import SPLITS, load, squeeze
 
 RESULTS = Path(__file__).parent / "results"
+EVAL_EXPERIMENT = "agent-eval"
 _ABSTAIN = re.compile(
     r"(do not|don't|does not|doesn't|could not|couldn't|can't|cannot|unable to)"
     r" (find|see|have|mention|cover|describe|document|contain|include|provide|exist|support"
@@ -107,7 +108,7 @@ def suspects(case: Case, turn: dict) -> list[str]:
 
 
 def run_case(case: Case, claims: bool = False) -> dict:
-    turn = service.run_turn(case.question, history=history_messages(case))
+    turn = service.run_turn(case.question, history=history_messages(case), environment="eval")
     chunks = retrieved(turn["thread_id"])
     checks = check(case, turn, chunks)
     return {"id": case.id, "kind": case.kind, "question": case.question,
@@ -129,6 +130,8 @@ def main() -> None:
     ap.add_argument("--name", default="dev")
     ap.add_argument("--claims", action="store_true", help="list suspect claims for a reader")
     args = ap.parse_args()
+    setup_tracing()
+    mlflow.set_experiment(EVAL_EXPERIMENT)     # traces too, so they never mix with live ones
     cases = load(SPLITS[args.split])
     if args.cases:
         cases = [c for c in cases if c.id in args.cases.split(",")]
@@ -163,8 +166,7 @@ def main() -> None:
     RESULTS.mkdir(exist_ok=True)
     (RESULTS / f"agent-{args.name}.json").write_text(
         json.dumps({"summary": summary, "rows": rows}, indent=1), encoding="utf-8")
-    mlflow.set_tracking_uri(get_settings().mlflow_tracking_uri)
-    mlflow.set_experiment("agent-eval")
+
     with mlflow.start_run(run_name=f"{args.name} x{args.repeats}"):
         mlflow.log_params({"split": args.split, "repeats": args.repeats})
         mlflow.log_metrics({k: v for k, v in summary.items() if v is not None})

@@ -126,9 +126,9 @@ def test_a_draft_never_reaches_the_client_on_a_research_turn(monkeypatch):
             return type("S", (), {"values": {"messages": [AIMessage(assistant.NOT_FOUND)]}})
 
     monkeypatch.setattr(service, "get_graph", lambda: Graph())
-    events = list(service.stream_turn("q"))
-    assert not [e for e in events if e["type"] == "token"]
-    assert events[-1]["answer"] == assistant.NOT_FOUND
+    events = list(service._run_graph("q", "t", None, "tr-1"))
+    assert "Secret draft" not in str(events)
+    assert events[-1]["answer"] == assistant.NOT_FOUND and events[-1]["trace_id"] == "tr-1"
 
 
 def test_graph_facts_cite_only_what_is_shown(monkeypatch):
