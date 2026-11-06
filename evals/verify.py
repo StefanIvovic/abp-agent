@@ -18,7 +18,8 @@ from abp_agent.config import get_settings
 from evals.schema import ABP_COMMIT, Case
 
 DATASETS = Path(__file__).parent / "datasets"
-SPLITS = {"dev": DATASETS / "dev.jsonl", "test": DATASETS / "test.jsonl"}
+SPLITS = {"dev": DATASETS / "dev.jsonl", "test": DATASETS / "test.jsonl",
+          "test2": DATASETS / "test2.jsonl"}
 SEAL = DATASETS / "test.sha256"
 
 
@@ -50,12 +51,15 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def seal_path(split: str) -> Path:
+    return SEAL if split == "test" else SEAL.with_name(f"{split}.sha256")
+
+
 def seal_errors() -> list[str]:
-    if not SEAL.exists():
-        return []       # not sealed yet: the split is still being reviewed
-    if SEAL.read_text().strip() != digest(SPLITS["test"]):
-        return ["test split changed since it was sealed"]
-    return []
+    """A split with no seal is still being reviewed."""
+    return [f"{split} split changed since it was sealed" for split, path in SPLITS.items()
+            if split != "dev" and seal_path(split).exists()
+            and seal_path(split).read_text().strip() != digest(path)]
 
 
 def check(repo: Path) -> list[str]:
@@ -73,7 +77,7 @@ def check(repo: Path) -> list[str]:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--seal", action="store_true")
+    ap.add_argument("--seal", nargs="?", const="test", choices=["test", "test2"])
     args = ap.parse_args()
     errors = check(Path(get_settings().abp_repo_dir))
     for e in errors:
@@ -82,13 +86,13 @@ def main() -> None:
         sys.exit(1)
     cases = {s: load(p) for s, p in SPLITS.items()}
     if args.seal:
-        drafts = [c.id for c in cases["test"] if c.status == "draft"]
+        drafts = [c.id for c in cases[args.seal] if c.status == "draft"]
         hard = [e for e in errors if "sealed" not in e]
-        if drafts or hard or not cases["test"]:
+        if drafts or hard or not cases[args.seal]:
             sys.exit(f"can't seal: {len(hard)} errors, drafts {drafts}, "
-                     f"{len(cases['test'])} test cases")
-        SEAL.write_text(digest(SPLITS["test"]) + "\n")
-        print("test split sealed")
+                     f"{len(cases[args.seal])} {args.seal} cases")
+        seal_path(args.seal).write_text(digest(SPLITS[args.seal]) + "\n")
+        print(f"{args.seal} split sealed")
     print(f"ok at ABP {ABP_COMMIT}: " + ", ".join(f"{len(c)} {s}" for s, c in cases.items()))
 
 

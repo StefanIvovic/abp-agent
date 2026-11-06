@@ -6,6 +6,7 @@ The format is in `schema.py`.
 ```powershell
 docker compose run --rm -v "${PWD}:/app" api python -m evals.verify          # check everything
 docker compose run --rm -v "${PWD}:/app" api python -m evals.verify --seal   # freeze the test split
+docker compose run --rm -v "${PWD}:/app" api python -m evals.verify --seal test2   # freeze the second one
 ```
 
 ## Rules
@@ -42,6 +43,15 @@ Step 1 is automatic. Steps 2 and 3 stay with a person, because a key has to be p
 4. Write a key only if the source settles it. Record the threads dropped for that reason.
 
 Steps 3 and 4 are human judgment, so they can make the set easier than real traffic.
+
+`test2.jsonl` is a second test set, written after the fixes `test.jsonl` led to, so `test-v1` stays
+comparable. Its forum questions follow the same steps with new inputs: threads changed since
+2024-11, leaving out every thread used before (2,681 left), then
+`shuf -n 120 --random-source=<(yes 20261106)`, read in that order. Candidates were judged from
+their titles, then read. Thread 10707 was skipped as the same topic as dev case c014. Dropped
+after reading: 10290, 8103, 9286, 8119, 9255, 9285 (no settled cause or no answer), 10377 (about
+templates), 10084 (UI packages), 10228 (no clear question), 8951 (the Angular code isn't in the
+repository).
 
 `must_match` and `must_not_match` hold regexes the automatic check applies, for what a machine can decide. Keep names out of `must_not_match` on abstain cases: a good answer may name a thing to say it does not exist.
 

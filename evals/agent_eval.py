@@ -128,7 +128,7 @@ def run_case(case: Case, claims: bool = False) -> dict:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--split", default="dev", choices=["dev", "test"])
+    ap.add_argument("--split", default="dev", choices=list(SPLITS))
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--cases", help="comma-separated ids")
     ap.add_argument("--name", default="dev")
