@@ -33,6 +33,7 @@ from abp_agent.agent.tools import TOOLS
 log = logging.getLogger(__name__)
 
 MAX_TOOL_ROUNDS = 4        # then the model must answer with what it has
+FIRST_CALL_TOKENS = 1000   # a first call is only a search: stops a runaway reply early
 HISTORY_TURNS = 6          # earlier turns sent to the model (all stay in the checkpoint)
 LONG_MESSAGE_CHARS = 400   # from here on a turn skips the router and counts as research
 ROUTES = ["research", "chitchat", "off_topic"]
@@ -114,11 +115,18 @@ def _drop_repeats(messages: list) -> list:
     return out
 
 
+def _drop_drafts(messages: list) -> list:
+    """Text written beside a tool call comes from memory, before any result, and the user never
+    sees it. Sent back, the model trusts it, or apologises for it as an "earlier answer" (D27)."""
+    return [m.model_copy(update={"content": ""})
+            if isinstance(m, AIMessage) and m.tool_calls and m.content else m for m in messages]
+
+
 def _history(messages: list) -> list:
     """The last HISTORY_TURNS turns, starting at a human message (never mid tool-exchange)."""
     humans = [i for i, m in enumerate(messages) if isinstance(m, HumanMessage)]
     start = humans[-HISTORY_TURNS] if len(humans) > HISTORY_TURNS else 0
-    return _drop_repeats(messages[start:])
+    return _drop_repeats(_drop_drafts(messages[start:]))
 
 
 def _dialogue(messages: list, turns: int = 3) -> list:
@@ -174,7 +182,7 @@ def agent(state: AgentState) -> dict:
                  if isinstance(m, AIMessage) and m.tool_calls)
     model, extra, nudge = chat_model(), "", []
     if rounds == 0:
-        model = model.bind_tools(TOOLS, tool_choice="required")
+        model = chat_model(max_tokens=FIRST_CALL_TOKENS).bind_tools(TOOLS, tool_choice="required")
     elif rounds < MAX_TOOL_ROUNDS:
         model = model.bind_tools(TOOLS)
     else:
@@ -186,8 +194,9 @@ def agent(state: AgentState) -> dict:
     system = SystemMessage(f"{SYSTEM_PROMPT}\n\nFor this turn: {extra}" if extra else SYSTEM_PROMPT)
     sent = [system, *_history(messages), *nudge]
     reply = model.invoke(sent)
-    if _is_text_tool_call(reply):           # one retry, then the guard decides
-        log.warning("model wrote a tool call as text; retrying once")
+    # LM Studio doesn't enforce a required tool call, so the model can skip it (D28)
+    if _is_text_tool_call(reply) or (rounds == 0 and not reply.tool_calls):
+        log.warning("no tool call where one was needed; retrying once, then the guard decides")
         reply = model.invoke(sent)
     return {"messages": [reply]}
 

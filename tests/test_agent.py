@@ -64,7 +64,8 @@ def test_a_long_message_skips_the_router():
 
 
 def test_research_must_start_with_a_tool_call(monkeypatch):
-    model = use(monkeypatch, AIMessage("a"))
+    call = AIMessage("", tool_calls=[{"name": "search", "args": {"query": "q"}, "id": "1"}])
+    model = use(monkeypatch, call)
     assistant.agent(state("research", HumanMessage("q")))
     assert model.bound == ["required"]
 
@@ -299,3 +300,28 @@ def test_an_unseen_call_is_shown_to_the_reader(monkeypatch):
     out = assistant.guard_output(state("research", HumanMessage("q"), *tool_turn(7), answer))
     assert out["guard"]["unseen_calls"] == ["FakeCall"]
     assert "check it first: `FakeCall`" in out["messages"][0].content
+
+
+def test_a_draft_beside_a_tool_call_is_not_sent_back(monkeypatch):
+    model = use(monkeypatch, AIMessage("Final [7]."))
+    draft = AIMessage("Its order is 1000.", tool_calls=[
+        {"name": "search", "args": {"query": "q"}, "id": "1"}])
+    result = ToolMessage("[7] docs: x\ntext", tool_call_id="1", name="search", artifact=[])
+    earlier = AIMessage("A real earlier answer.")
+    assistant.agent(state("research", HumanMessage("a"), earlier, HumanMessage("b"), draft, result))
+    sent = model.sent[0]
+    assert [m.content for m in sent if isinstance(m, AIMessage)] == ["A real earlier answer.", ""]
+    assert sent[-2].tool_calls and draft.content == "Its order is 1000."
+
+
+def test_a_skipped_first_tool_call_is_retried_once(monkeypatch):
+    call = AIMessage("", tool_calls=[{"name": "search", "args": {"query": "q"}, "id": "1"}])
+    model = use(monkeypatch, AIMessage("[1, 2, 3, 4"), call)
+    out = assistant.agent(state("research", HumanMessage("q")))
+    assert out["messages"][0].tool_calls and len(model.sent) == 2
+
+
+def test_a_later_answer_without_a_tool_call_is_not_retried(monkeypatch):
+    model = use(monkeypatch, AIMessage("Final [7]."))
+    assistant.agent(state("research", HumanMessage("q"), *tool_turn(7)))
+    assert len(model.sent) == 1

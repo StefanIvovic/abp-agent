@@ -42,7 +42,7 @@ _SAMPLE_DECLARES = re.compile(r"\b(?!await\b|return\b|new\b|throw\b|typeof\b|nam
 # Everyday .NET and DI calls a sample may use without a source showing them
 COMMON_CALLS = frozenset({
     "AddScoped", "AddSingleton", "AddTransient", "Clear", "Configure", "Contains", "FromResult",
-    "Insert", "MailAddress", "RemoveAll", "Replace", "Scoped", "Single", "Singleton",
+    "FromHours", "FromMinutes", "FromSeconds", "Insert", "MailAddress", "RemoveAll", "Replace", "Scoped", "Single", "Singleton",
     "ToDictionary", "Transient"})
 _QUOTED = re.compile(r"\"[^\"]*\"")     # a string in a sample is the reader's value, not an API
 _PLACEHOLDER = re.compile(r"(?:My|Your|Sample|Example)[A-Z]")   # the reader's names, not ABP's
