@@ -26,7 +26,8 @@ docker compose run --rm -v "${PWD}:/app" api python -m evals.verify --seal   # f
    id, and running it again adds only new turns.
 2. Open the trace and find out what went wrong.
 3. Write the key from the docs and source, with evidence quotes, and add the case to `dev.jsonl`
-   with `status: reviewed`. A comment or rating is a lead, not a key.
+   with `status: reviewed`. A comment or rating is a lead, not a key. If the bug needs real searches
+   on an earlier turn, use `asked_before`: `history` is only text.
 4. Run `python -m evals.verify`, then the case with `python -m evals.agent_eval --cases <id>`.
 
 Step 1 is automatic. Steps 2 and 3 stay with a person, because a key has to be proved.

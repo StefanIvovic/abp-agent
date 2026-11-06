@@ -325,3 +325,20 @@ def test_a_later_answer_without_a_tool_call_is_not_retried(monkeypatch):
     model = use(monkeypatch, AIMessage("Final [7]."))
     assistant.agent(state("research", HumanMessage("q"), *tool_turn(7)))
     assert len(model.sent) == 1
+
+
+def test_a_source_from_an_earlier_turn_can_be_cited_again():
+    s = state("research", HumanMessage("a"), *tool_turn(7), AIMessage("A [7]."),
+              HumanMessage("b"), *tool_turn(8), AIMessage("B [7] and [8]."))
+    out = assistant.guard_output(s)
+    assert out["guard"]["citations_removed"] == []
+    assert [c["chunk_id"] for c in out["citations"]] == [7, 8]
+
+
+def test_a_source_the_model_can_no_longer_see_is_removed():
+    old = [HumanMessage("old"), *tool_turn(7), AIMessage("A [7].")]
+    filler = [m for i in range(assistant.HISTORY_TURNS - 1)
+              for m in (HumanMessage(f"q{i}"), AIMessage("x"))]
+    s = state("research", *old, *filler, HumanMessage("b"), *tool_turn(8),
+              AIMessage("B [7] and [8]."))
+    assert assistant.guard_output(s)["guard"]["citations_removed"] == [7]

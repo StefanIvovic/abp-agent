@@ -45,6 +45,9 @@ class Case(BaseModel):
     source: Literal["forum", "human", "claude"]
     url: str | None = Field(default=None, description="the forum thread it was paraphrased from")
     history: list[Turn] = []
+    asked_before: list[str] = Field(
+        default=[], description="questions really run first in the same chat, searches included: "
+                                "`history` is only text, so it can't reproduce those bugs")
     question: str
     answer: str = Field(description="the expected answer in words: what a grader compares with")
     must_include: list[str] = Field(

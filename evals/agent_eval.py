@@ -16,6 +16,7 @@ import argparse
 import json
 import re
 import statistics
+import uuid
 from pathlib import Path
 
 import mlflow
@@ -108,7 +109,10 @@ def suspects(case: Case, turn: dict) -> list[str]:
 
 
 def run_case(case: Case, claims: bool = False) -> dict:
-    turn = service.run_turn(case.question, history=history_messages(case), environment="eval")
+    thread_id = str(uuid.uuid4())
+    for earlier in case.asked_before:
+        service.run_turn(earlier, thread_id, environment="eval")
+    turn = service.run_turn(case.question, thread_id, history_messages(case), environment="eval")
     chunks = retrieved(turn["thread_id"])
     checks = check(case, turn, chunks)
     return {"id": case.id, "kind": case.kind, "question": case.question,

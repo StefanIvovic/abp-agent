@@ -122,11 +122,14 @@ def _drop_drafts(messages: list) -> list:
             if isinstance(m, AIMessage) and m.tool_calls and m.content else m for m in messages]
 
 
-def _history(messages: list) -> list:
+def _window(messages: list) -> list:
     """The last HISTORY_TURNS turns, starting at a human message (never mid tool-exchange)."""
     humans = [i for i, m in enumerate(messages) if isinstance(m, HumanMessage)]
-    start = humans[-HISTORY_TURNS] if len(humans) > HISTORY_TURNS else 0
-    return _drop_repeats(_drop_drafts(messages[start:]))
+    return messages[humans[-HISTORY_TURNS] if len(humans) > HISTORY_TURNS else 0:]
+
+
+def _history(messages: list) -> list:
+    return _drop_repeats(_drop_drafts(_window(messages)))
 
 
 def _dialogue(messages: list, turns: int = 3) -> list:
@@ -209,13 +212,14 @@ def reply(state: AgentState) -> dict:
 
 
 def guard_output(state: AgentState) -> dict:
-    """Citations must point at sources retrieved this turn (invented ids are removed), and an
-    answer must cite at least one: an uncited answer rests on nothing, so it's replaced."""
+    """Citations must point at sources the model was given, on this turn or an earlier one it can
+    still see (D30). Invented ids are removed, and an answer must cite at least one: an uncited
+    answer rests on nothing, so it's replaced."""
     messages = state["messages"]
     final = messages[-1]
     turn = messages[_turn_start(messages):]
     retrieved: dict[int, dict] = {}
-    for m in turn:
+    for m in _window(messages):
         if isinstance(m, ToolMessage) and isinstance(m.artifact, list):
             for c in m.artifact:
                 retrieved.setdefault(c["chunk_id"], c)
