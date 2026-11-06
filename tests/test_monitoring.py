@@ -44,6 +44,7 @@ def test_the_prompt_version_follows_the_prompt():
     ({}, [{"value": True}], []),
     ({"answer_replaced": "yes"}, [], ["answer_replaced"]),
     ({"router_failed": "yes"}, [], ["router_failed"]),
+    ({"analysis_failed": "yes"}, [], ["analysis_failed"]),
     ({"status": "error"}, [], ["error"]),
     ({"citations_removed": "1", "unseen_calls": "2"}, [], ["citations_removed", "unseen_calls"]),
     ({"answer_replaced": "yes"}, [{"value": False}], ["thumbs_down", "answer_replaced"]),
@@ -90,3 +91,13 @@ def test_rating_an_unknown_trace_is_a_404(monkeypatch):
     monkeypatch.setattr(feedback.mlflow, "log_feedback", boom)
     r = TestClient(app).post("/feedback", json={"trace_id": "nope", "thumbs_up": True})
     assert r.status_code == 404
+
+
+def test_the_analysis_is_filterable_and_a_failure_shows():
+    tags = observability.turn_tags(done(
+        analysis={"technology": "javascript", "platform": "mvc", "intent": "why",
+                  "identifiers": ["abp.ajax"]}), set(), "live")
+    assert (tags["technology"], tags["platform"], tags["intent"]) == ("javascript", "mvc", "why")
+    assert tags["identifiers"] == "1" and tags["analysis_failed"] == "no"
+    failed = observability.turn_tags(done(analysis_failed=True), set(), "live")
+    assert failed["analysis_failed"] == "yes" and failed["technology"] == "none"

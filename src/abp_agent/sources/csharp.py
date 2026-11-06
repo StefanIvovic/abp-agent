@@ -19,7 +19,7 @@ from tree_sitter import Language, Node, Parser
 from abp_agent.documents.chunking import TextChunk, pack_blocks
 
 GITHUB = "https://github.com/abpframework/abp/blob"
-PARSER_VERSION = "cs-v1"        # bump when parsing or chunking changes
+PARSER_VERSION = "cs-v2"        # bump when parsing or chunking changes
 CHUNK_TOKENS = 512
 MIN_TOKENS = 50
 SCOPES = ("framework/src/*/**/*.cs", "modules/*/src/*/**/*.cs")
@@ -184,7 +184,9 @@ def search_header(t: CodeType, path: str, names: list[str]) -> str:
 
 
 def chunk_file(parsed: ParsedFile) -> list[TextChunk]:
-    """A type that fits is one chunk. A larger one becomes runs of whole members."""
+    """A type that fits is one chunk. A larger one becomes runs of whole members, each shown under
+    the type's declaration, because bases and attributes are often what a question turns on.
+    search_text keeps its header instead, so the declaration isn't indexed twice."""
     tokenize = get_tokenizer()
     out: list[TextChunk] = []
     seen: dict[str, int] = {}
@@ -193,7 +195,8 @@ def chunk_file(parsed: ParsedFile) -> list[TextChunk]:
         key = t.name[:240] + (f" ({n})" if n > 1 else "")   # unique per document
         title = f"{t.namespace}.{t.name}" if t.namespace else t.name
         names = [t.name, *(m.name for m in t.members)]
-        if len(tokenize(t.text)) <= CHUNK_TOKENS or not t.members:
+        whole = len(tokenize(t.text)) <= CHUNK_TOKENS or not t.members
+        if whole:
             pieces = pack_blocks([t.text], CHUNK_TOKENS, MIN_TOKENS)
         else:
             pieces = pack_blocks([m.text for m in t.members], CHUNK_TOKENS, MIN_TOKENS)
@@ -204,7 +207,8 @@ def chunk_file(parsed: ParsedFile) -> list[TextChunk]:
             anchor = f"#L{line}-L{last}" if last else f"#L{line}"
             header = search_header(t, parsed.path, [t.name, *(m.name for m in inside)] if
                                    len(pieces) > 1 else names)
-            out.append(TextChunk(key, title, i, piece, f"{header}\n\n{piece}",
-                                 len(tokenize(piece)),
+            shown = piece if whole else f"{t.signature}\n\n{piece}"
+            out.append(TextChunk(key, title, i, shown, f"{header}\n\n{piece}",
+                                 len(tokenize(shown)),
                                  {"url": parsed.url + anchor, "title": title}))
     return out

@@ -27,6 +27,8 @@ def reasons(tags: dict, ratings: list[dict]) -> list[str]:
         found.append("answer_replaced")
     if tags.get("router_failed") == "yes":
         found.append("router_failed")
+    if tags.get("analysis_failed") == "yes":
+        found.append("analysis_failed")
     if tags.get("status") == "error":
         found.append("error")
     found += [k for k in ("citations_removed", "unverified_names", "unseen_calls")

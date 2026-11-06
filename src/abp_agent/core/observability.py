@@ -44,9 +44,15 @@ def turn_tags(done: dict, known_tools: set[str], environment: str) -> dict[str, 
     """What the agent decided in a turn. Details stay in the spans; tags make them filterable."""
     guard = done.get("guard") or {}
     tools = [s["name"] for s in done.get("steps", [])]
+    analysis = guard.get("analysis") or {}
     return {
         "environment": environment,
         "status": "done",
+        "technology": analysis.get("technology") or "none",
+        "platform": analysis.get("platform") or "none",
+        "intent": analysis.get("intent") or "none",
+        "identifiers": str(len(analysis.get("identifiers") or [])),
+        "analysis_failed": "yes" if guard.get("analysis_failed") else "no",
         "route": guard.get("route") or "none",
         "input_blocked": guard.get("input_blocked") or "no",
         "router_failed": "yes" if guard.get("router_failed") else "no",

@@ -26,6 +26,8 @@ IDENTIFIER = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]{3,}\b")
 _FENCE = re.compile(r"```.*?```", re.DOTALL)
 _INLINE = re.compile(r"`([^`\n]+)`")
 _TYPE_NAME = re.compile(r"\b(?:[A-Z][a-z0-9]+){2,}[A-Za-z0-9]*\b|\bI[A-Z][a-z]+[A-Za-z0-9]*\b")
+# An exact API name in a question: abp.localization.getResource, IStringLocalizer. Not abp.io.
+API_NAME = re.compile(rf"\babp\.(?!io\b)\w+(?:\.\w+)*|{_TYPE_NAME.pattern}")
 _DECLARED = re.compile(r"\b(?:class|interface|record|struct|enum)\s+(\w+)")
 _SENTENCE = re.compile(r"(?<=[.!?])\s+|\n+")
 # A sentence saying a name doesn't exist isn't a claim that it does

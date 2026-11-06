@@ -70,10 +70,32 @@ def test_a_large_type_is_cut_between_members(tmp_path):
     chunks = csharp.chunk_file(parsed(tmp_path, source))
     assert len(chunks) > 1
     for c in chunks:
-        assert c.text.lstrip().startswith("public int Method")     # never mid-method
+        declaration, members = c.text.split("\n\n", 1)
+        assert declaration == "public class Big"
+        assert members.lstrip().startswith("public int Method")     # never mid-method
         assert c.search_text.startswith("ABP source | N | public class Big")
     assert sum(c.text.count("public int Method") for c in chunks) == 20
     assert len({c.chunk_index for c in chunks}) == len(chunks)
+
+
+def test_a_large_type_shows_its_bases_and_attributes_in_every_chunk(tmp_path):
+    body = "\n".join(
+        f"    public int Method{i}() {{ return {' + '.join(['1'] * 60)}; }}" for i in range(20))
+    source = (f"namespace N;\n[DependsOn(typeof(AModule))]\npublic class Big : Base, IThing\n"
+              f"{{\n{body}\n}}\n").encode()
+    chunks = csharp.chunk_file(parsed(tmp_path, source))
+    assert len(chunks) > 1
+    for c in chunks:
+        assert c.text.startswith("[DependsOn(typeof(AModule))] public class Big : Base, IThing\n\n")
+
+
+def test_the_declaration_is_shown_but_not_searched_twice(tmp_path):
+    body = "\n".join(
+        f"    public int Method{i}() {{ return {' + '.join(['1'] * 60)}; }}" for i in range(20))
+    source = f"namespace N {{ public class Big\n{{\n{body}\n}}\n}}".encode()
+    for c in csharp.chunk_file(parsed(tmp_path, source)):
+        assert c.search_text.count("public class Big") == 1
+        assert c.token_count > 0
 
 
 def test_block_scoped_namespaces_work(tmp_path):

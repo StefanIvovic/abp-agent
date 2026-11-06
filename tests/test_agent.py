@@ -342,3 +342,77 @@ def test_a_source_the_model_can_no_longer_see_is_removed():
     s = state("research", *old, *filler, HumanMessage("b"), *tool_turn(8),
               AIMessage("B [7] and [8]."))
     assert assistant.guard_output(s)["guard"]["citations_removed"] == [7]
+
+
+@pytest.mark.parametrize(("message", "expected"), [
+    ("Why does abp.localization.getResource ignore it?", ["abp.localization.getResource"]),
+    ("IStringLocalizer and AbpLocalizationOptions, IStringLocalizer again",
+     ["IStringLocalizer", "AbpLocalizationOptions"]),
+    ("See abp.io for how to do this", []),
+    ("How do I stop that from running?", []),
+])
+def test_exact_names_are_read_from_the_message_by_code(message, expected):
+    assert assistant.identifiers(message) == expected
+
+
+def test_a_pasted_log_cant_flood_the_identifiers():
+    message = " ".join(f"SomeType{i}Name" for i in range(50))
+    assert len(assistant.identifiers(message)) == assistant.MAX_IDENTIFIERS
+
+
+def test_the_analysis_comes_from_the_schema_and_keeps_the_guard(monkeypatch):
+    model = use(monkeypatch, AIMessage(
+        '{"technology": "javascript", "platform": "mvc", "intent": "how_to"}'))
+    out = assistant.analyze_query({"messages": [HumanMessage("Use abp.ajax here")],
+                                   "guard": {"x": 1}})
+    assert out["guard"] == {"x": 1, "analysis": {
+        "technology": "javascript", "platform": "mvc", "intent": "how_to",
+        "identifiers": ["abp.ajax"]}}
+    assert model.bound[0]["response_format"] == assistant.ANALYSIS_SCHEMA
+
+
+@pytest.mark.parametrize("reply", [
+    AIMessage("prose"), AIMessage('{"technology": "cobol", "platform": "mvc", "intent": "why"}'),
+    AIMessage('{"technology": "csharp"}'), RuntimeError("down")])
+def test_a_failed_analysis_keeps_the_names_and_says_so(monkeypatch, reply):
+    use(monkeypatch, reply)
+    out = assistant.analyze_query({"messages": [HumanMessage("Use IThingService")], "guard": {}})
+    assert out["guard"] == {"analysis_failed": True, "analysis": {"identifiers": ["IThingService"]}}
+
+
+def test_the_hint_leaves_out_what_is_unknown():
+    assert assistant.analysis_hint(None) == ""
+    assert assistant.analysis_hint({"technology": "unknown", "platform": "unknown",
+                                    "intent": "other", "identifiers": []}) == ""
+    hint = assistant.analysis_hint({"technology": "javascript", "platform": "unknown",
+                                    "intent": "how_to", "identifiers": ["abp.ajax"]})
+    assert hint == ("This question looks like: technology javascript, intent how_to. "
+                    "Exact names to keep in a search: abp.ajax.")
+
+
+def test_the_agent_gets_the_hint_in_its_one_system_message(monkeypatch):
+    model = use(monkeypatch, AIMessage("", tool_calls=[
+        {"name": "search", "args": {"query": "q"}, "id": "1"}]))
+    assistant.agent({"messages": [HumanMessage("q")], "guard": {
+        "route": "research", "analysis": {"technology": "razor", "identifiers": []}}})
+    system = model.sent[0][0].content
+    assert system.startswith(assistant.SYSTEM_PROMPT)
+    assert system.endswith("For this turn: This question looks like: technology razor.")
+    assert sum(m.type == "system" for m in model.sent[0]) == 1
+
+
+def test_analysis_runs_between_the_input_guard_and_the_router():
+    edges = {(e.source, e.target) for e in assistant.build().get_graph().edges}
+    assert ("guard_input", "analyze_query") in edges
+    assert ("analyze_query", "route") in edges
+    assert ("guard_input", "route") not in edges
+    assert ("guard_input", "__end__") in edges          # a blocked message skips it
+
+
+@pytest.mark.parametrize("reply", [
+    AIMessage('{"technology": "razor", "platform": "mvc", "intent": "how_to"}'), RuntimeError("x")])
+def test_an_abp_name_means_javascript_even_if_the_model_says_otherwise(monkeypatch, reply):
+    use(monkeypatch, reply)
+    out = assistant.analyze_query({"messages": [HumanMessage("Use abp.ajax in my Razor Page")],
+                                   "guard": {}})
+    assert out["guard"]["analysis"]["technology"] == "javascript"

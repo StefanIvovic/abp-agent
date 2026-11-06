@@ -62,7 +62,8 @@ Every chat turn is one trace in MLflow: http://localhost:5001/#/experiments/4/tr
 
 Filter traces by tag: `route`, `answer_replaced`, `citations_removed`, `unverified_names`,
 `unseen_calls`, `first_call_retried`, `router_failed`, `input_blocked`, `invalid_tools`,
-`tool_rounds`, `tool_calls`, `citations`, `environment`, `status`, plus `model`, `prompt_version`
+`tool_rounds`, `tool_calls`, `citations`, `technology`, `platform`, `intent`, `identifiers`,
+`analysis_failed`, `environment`, `status`, plus `model`, `prompt_version`
 and `app_version`.
 
 Rate answers with the thumbs on the chat page, or `POST /feedback`. A thumbs down asks what was
