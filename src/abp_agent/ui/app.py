@@ -47,7 +47,6 @@ if question := st.chat_input("Ask about ABP"):
     with st.chat_message("assistant"):
         status = st.status("Thinking…", expanded=False)
         box = st.empty()
-        streamed = ""
         for ev in events(question):
             if ev["type"] == "start":
                 ss.thread_id = ev["thread_id"]
@@ -56,9 +55,6 @@ if question := st.chat_input("Ask about ABP"):
                 status.write(f"**{ev['name']}** `{ev['args']}`")
             elif ev["type"] == "tool_result":
                 status.write(f"→ {ev['sources']} sources")
-            elif ev["type"] == "token":
-                streamed += ev["text"]
-                box.markdown(streamed + "▌")
             elif ev["type"] == "error":
                 status.update(label="Error", state="error")
                 box.error(ev["message"])

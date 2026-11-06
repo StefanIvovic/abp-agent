@@ -51,6 +51,10 @@ class Case(BaseModel):
         default=[], description="facts a correct answer states; a grader checks each one")
     must_not_say: list[str] = Field(
         default=[], description="wrong answers worth catching, e.g. an API that doesn't exist")
+    must_match: list[str] = Field(
+        default=[], description="regexes the answer must match: must_include a machine can check")
+    must_not_match: list[str] = Field(
+        default=[], description="regexes it must not match: must_not_say a machine can check")
     evidence: list[Evidence] = []
     note: str = ""
 

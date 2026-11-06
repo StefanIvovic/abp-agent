@@ -30,5 +30,7 @@ docker compose run --rm -v "${PWD}:/app" api python -m evals.verify --seal   # f
 
 Steps 3 and 4 are human judgment, so they can make the set easier than real traffic.
 
+`must_match` and `must_not_match` hold regexes the automatic check applies, for what a machine can decide. Keep names out of `must_not_match` on abstain cases: a good answer may name a thing to say it does not exist.
+
 Dropped so far because the source doesn't settle them: 9276 (validation order depends on
 interceptor order), 8911 (no clear root cause).

@@ -1,8 +1,8 @@
 """Checks on what an answer claims. A citation proves a passage was retrieved, not that it says
 what the sentence says, so these read the answer itself:
 
-- check_names: every code name must exist somewhere in ABP. Plain code, no LLM, almost free. Runs
-  on live answers.
+- check_names: every code name an answer claims must exist somewhere in ABP. Plain code, no LLM,
+  almost free. Runs on live answers.
 - check_claims: one LLM call compares the answer with the passages it cites. It finds real
   problems but flagged 59 of 92 answers, many wrongly, so it only lists suspects in evals (D23).
 """
@@ -25,6 +25,17 @@ _FENCE = re.compile(r"```.*?```", re.DOTALL)
 _INLINE = re.compile(r"`([^`\n]+)`")
 _TYPE_NAME = re.compile(r"\b(?:[A-Z][a-z0-9]+){2,}[A-Za-z0-9]*\b|\bI[A-Z][a-z]+[A-Za-z0-9]*\b")
 _DECLARED = re.compile(r"\b(?:class|interface|record|struct|enum)\s+(\w+)")
+_SENTENCE = re.compile(r"(?<=[.!?])\s+|\n+")
+# A sentence saying a name doesn't exist isn't a claim that it does
+_DENIAL = re.compile(r"no such|found nothing|(?:doesn't|does not) exist|there(?: is|'s) no"
+                     r"|no built-in|(?:couldn't|could not) find|none of (?:those|these)|\bno `"
+                     r"|not from `|(?:can't|cannot) (?:show|confirm|point)|(?:don't|do not) have",
+                     re.I)
+_QUOTED = re.compile(r"\"[^\"]*\"")     # a string in a sample is the reader's value, not an API
+_PLACEHOLDER = re.compile(r"(?:My|Your|Sample|Example)[A-Z]")   # the reader's names, not ABP's
+_DOTNET_NAMESPACE = ("System.", "Microsoft.")
+# .NET members answers name in prose. Not in ABP's text, so the name list can't know them.
+DOTNET_NAMES = frozenset({"DbUpdateException", "ReplyTo", "ReplyToList"})
 
 CLAIMS_PROMPT = """You check an answer about the ABP Framework against the passages it cites. List only claims the passages don't support or that they contradict: a class, flow or behaviour attributed to the wrong place, a cause the passages don't state, or a fact the cited passage doesn't contain. Don't list style, general .NET knowledge, or claims the passages do support. If everything is supported, return an empty list."""
 
@@ -45,11 +56,18 @@ def known_names() -> frozenset[str]:
 
 
 def code_names(answer: str) -> set[str]:
-    """Type-like names in `inline code`. Fenced samples are left out: they hold the reader's own
-    example classes, and a name the answer declares there isn't a claim about ABP."""
-    prose = _FENCE.sub(" ", answer)
-    found = {n for span in _INLINE.findall(prose) for n in _TYPE_NAME.findall(span)}
-    return found - set(_DECLARED.findall(answer))
+    """Type-like names the answer claims exist, from `inline code`. Fenced samples are left out:
+    they hold the reader's own example classes. So are names it denies, the reader's placeholders
+    and .NET names: warning about those teaches readers to ignore the warning."""
+    found: set[str] = set()
+    for sentence in _SENTENCE.split(_FENCE.sub(" ", answer)):
+        if _DENIAL.search(sentence.replace("’", "'")):
+            continue
+        for span in _INLINE.findall(sentence):
+            if not span.startswith(_DOTNET_NAMESPACE) and "*" not in span:   # * is a name pattern
+                found.update(_TYPE_NAME.findall(_QUOTED.sub(" ", span)))
+    return {n for n in found - set(_DECLARED.findall(answer)) - DOTNET_NAMES
+            if not _PLACEHOLDER.match(n)}
 
 
 def check_names(answer: str, question: str, known: frozenset[str] | set[str]) -> list[str]:
