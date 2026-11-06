@@ -72,6 +72,32 @@ wrong. Then collect what's worth an eval case:
 docker compose run --rm -v "${PWD}:/app" api python -m evals.candidates
 ```
 
+## MCP server
+
+The agent's read tools for any MCP client, at `http://localhost:8011/mcp` (streamable HTTP):
+`search` and `code_graph`. They need no LLM, and results list where each `[id]` points.
+
+Every call needs the token from `MCP_TOKEN` in `.env`. With no token set, nobody gets in. Only
+`/mcp` is protected: the rest of the API has no login, so keep it on localhost.
+
+```powershell
+claude mcp add --transport http abp-agent http://localhost:8011/mcp --header "Authorization: Bearer <MCP_TOKEN>"
+```
+
+## CI
+
+`.github/workflows/ci.yml` builds the image, then runs lint and tests in it on each push. It is ready
+but not connected: the repository is local for now, so it only runs once it has a GitHub remote.
+To run the same steps locally:
+
+```powershell
+docker build -f docker/app.Dockerfile -t abp-agent-app:ci .
+docker run --rm --network none abp-agent-app:ci ruff check .
+docker run --rm --network none abp-agent-app:ci python -m pytest -q
+```
+
+`evals.verify` and the agent evals stay local: they need the ABP repository, the stack and a model.
+
 ## Common commands
 
 ```powershell

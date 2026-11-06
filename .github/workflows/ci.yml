@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The same image as local runs, so CI needs no Python setup of its own.
+      - name: Build
+        run: docker build -f docker/app.Dockerfile -t abp-agent-app:ci .
+      - name: Lint
+        run: docker run --rm abp-agent-app:ci ruff check .
+      # No stack here: these tests use no services. evals.verify needs the ABP repository, so it
+      # stays a local step.
+      - name: Test
+        run: docker run --rm abp-agent-app:ci python -m pytest -q

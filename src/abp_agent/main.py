@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI
@@ -9,12 +10,23 @@ from abp_agent.config import Settings, get_settings
 from abp_agent.core.health import run_checks
 from abp_agent.feedback import router as feedback_router
 from abp_agent.graph.router import router as graph_router
+from abp_agent.mcp_server import mcp
 from abp_agent.retrieval.router import router as retrieval_router
+
+mcp_app = mcp.streamable_http_app()     # also creates the session manager the lifespan runs
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    async with mcp.session_manager.run():
+        yield
+
 
 app = FastAPI(
     title="ABP Agent",
     version=__version__,
     description="Answers ABP Framework questions from its docs and source code.",
+    lifespan=lifespan,
 )
 
 
@@ -35,3 +47,6 @@ async def health(settings: Annotated[Settings, Depends(get_settings)]) -> JSONRe
     """Readiness: checks every dependency. Returns 503 if a required one is down."""
     report = await run_checks(settings)
     return JSONResponse(report, status_code=200 if report["status"] == "ok" else 503)
+
+
+app.mount("/", mcp_app)     # last: serves /mcp and only gets what the routes above did not match

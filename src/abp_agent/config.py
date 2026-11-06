@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     # ABP repository (bind-mounted read-only; see compose.yaml)
     abp_repo_dir: str = "/sources/abp"
 
+    # MCP server: clients send this as a bearer token. Empty means nobody gets in.
+    mcp_token: str = ""
+    mcp_public_url: str = "http://localhost:8011"
+
     @property
     def database_url(self) -> str:
         """SQLAlchemy URL using the psycopg 3 driver."""
