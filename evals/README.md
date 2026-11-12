@@ -68,6 +68,18 @@ indexed), 9199 (microservice template and gateway setup), 8858, 9531, 8878, 1005
 10193 (SaaS is a Pro module). Seven cases are written by Claude for kinds the forum rarely
 covers: two graph, two abstain, two exact signatures and one injection.
 
+## Changes to sealed keys
+
+Each one re-sealed with `verify --seal`, after `verify` passed at the pinned ABP commit.
+
+- **2026-11-12, test3 c075:** `must_not_match` was `RequiresNew\s*=`, meant to catch the
+  nonexistent `[UnitOfWork(RequiresNew = true)]`. Patterns match ignoring case, so it also failed a
+  correct answer that quoted the real signature `Begin(AbpUnitOfWorkOptions options, bool
+  requiresNew = false)` (test3-v2-bge run 0). Now `(?-i:RequiresNew\s*=)`, case-sensitive: ABP has
+  no `RequiresNew` property or attribute argument at the pinned commit or in 10.7.1, only the
+  `requiresNew` parameter. Checked on every saved c075 answer: test3-v1 unchanged (3 passes), the
+  wrongly failed run now passes, and both wrong forms are still caught.
+
 `must_match` and `must_not_match` hold regexes the automatic check applies, for what a machine can decide. Keep names out of `must_not_match` on abstain cases: a good answer may name a thing to say it does not exist.
 
 Dropped so far because the source doesn't settle them: 9276 (validation order depends on
