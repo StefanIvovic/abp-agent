@@ -19,7 +19,7 @@ from evals.schema import ABP_COMMIT, Case
 
 DATASETS = Path(__file__).parent / "datasets"
 SPLITS = {"dev": DATASETS / "dev.jsonl", "test": DATASETS / "test.jsonl",
-          "test2": DATASETS / "test2.jsonl"}
+          "test2": DATASETS / "test2.jsonl", "test3": DATASETS / "test3.jsonl"}
 SEAL = DATASETS / "test.sha256"
 
 
@@ -77,7 +77,7 @@ def check(repo: Path) -> list[str]:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--seal", nargs="?", const="test", choices=["test", "test2"])
+    ap.add_argument("--seal", nargs="?", const="test", choices=["test", "test2", "test3"])
     args = ap.parse_args()
     errors = check(Path(get_settings().abp_repo_dir))
     for e in errors:

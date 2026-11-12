@@ -39,7 +39,7 @@ class Case(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(pattern=r"^c\d{3}$")
-    split: Literal["dev", "test", "test2"]
+    split: Literal["dev", "test", "test2", "test3"]
     status: Literal["draft", "reviewed", "rejected"] = "draft"
     kind: Kind
     source: Literal["forum", "human", "claude"]

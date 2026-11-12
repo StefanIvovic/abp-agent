@@ -53,6 +53,18 @@ after reading: 10290, 8103, 9286, 8119, 9255, 9285 (no settled cause or no answe
 templates), 10084 (UI packages), 10228 (no clear question), 8951 (the Angular code isn't in the
 repository).
 
+`test3.jsonl` is a third test set, written after the rule C study on dev (2026-11-07), for a score
+on questions nobody has tuned against. Forum questions follow the same steps: threads changed since
+2024-11, leaving out every thread used before and the 14 threads the earlier prototype used (2,683 left), then
+`shuf -n 120 --random-source=<(yes 20261107)`, read in that order. Candidates were judged from
+their titles, then read. Kept: 10131, 9235, 8311, 10646, 8925, 10096, 10425, 10630. Dropped after
+reading: 9412 (the page is in a Pro module), 9079 (the source doesn't show why their change
+tracking settings didn't help), 9493 (the fix is only in a community article, which isn't
+indexed), 9199 (microservice template and gateway setup), 8858, 9531, 8878, 10056, 9087, 8291,
+9343, 8984, 10748 (no cause the source settles), 2768 (question deleted), 8833 (Serilog, not ABP),
+10193 (SaaS is a Pro module). Seven cases are written by Claude for kinds the forum rarely
+covers: two graph, two abstain, two exact signatures and one injection.
+
 `must_match` and `must_not_match` hold regexes the automatic check applies, for what a machine can decide. Keep names out of `must_not_match` on abstain cases: a good answer may name a thing to say it does not exist.
 
 Dropped so far because the source doesn't settle them: 9276 (validation order depends on
