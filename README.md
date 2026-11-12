@@ -1,7 +1,63 @@
 # ABP Agent
 
-Answers ABP Framework questions from its docs and source code, with citations. See
-[docs/roadmap.md](docs/roadmap.md) and [docs/decisions.md](docs/decisions.md).
+Answers ABP Framework questions from its docs and source code, with citations. Built evals first:
+real forum questions, answer keys proved against the ABP source, and sealed test sets.
+
+| Doc | What's in it |
+|---|---|
+| [docs/decisions.md](docs/decisions.md) | Every design decision, with the measurement behind it |
+| [docs/experiments.md](docs/experiments.md) | Studies run on failures: what was tried, kept and dropped |
+| [docs/model-trial.md](docs/model-trial.md) | How the agent model was picked |
+| [docs/roadmap.md](docs/roadmap.md) | The build phases |
+| [evals/README.md](evals/README.md) | Eval rules, how questions are chosen, from a failure to an eval case |
+
+## How it works
+
+**Sources**, loaded by a Prefect flow into Postgres with BM25 (pg_search) and vectors (pgvector):
+the ABP docs (4,842 chunks), the C# source parsed with tree-sitter by type and member (7,714
+chunks), and ABP's own JavaScript. A **code graph** in Neo4j is parsed from the C#, with no LLM:
+modules, dependencies, inheritance, interfaces and implementations, options, and the doc pages
+naming each type.
+
+Each turn is a LangGraph graph:
+
+1. **Input guard** (code): length limit and obvious prompt-injection phrases.
+2. **analyze_query**: code reads exact names; the model picks technology, platform and intent from
+   fixed lists (JSON schema). The result is a hint for the turn.
+3. **Router** (model, JSON schema): research, chit-chat or off-topic. Only research reaches the
+   model; the others get fixed text.
+4. **Agent loop** (qwen3.8-27b): calls `search` (docs and code ranked separately, then interleaved)
+   and `code_graph` (exact relations) until it can answer with citations.
+5. **Output guard** (code), before anything is shown: removes citations to passages the model wasn't
+   given, flags code names that don't exist in ABP, and warns about calls in code samples that no
+   retrieved passage showed. Research answers are held until it passes.
+
+Every turn is an MLflow trace with decision tags. Thumbs down and guard actions are collected as
+eval candidates. The read tools are also served over MCP.
+
+## Results
+
+Two scores, reported separately (D21, D25):
+
+- **Automatic checks** prove behaviour: it searched, cited real passages, matched the key's
+  patterns, and refused when ABP lacks the thing.
+- **Read grades** check correctness: every answer is read in full against its key, and doubtful
+  claims are checked in the ABP source. One false detail fails the answer. Grading is done by
+  Claude in a session, using rules set from my marks on test answers (D25), so the grader isn't
+  independent (D4). I haven't yet spot-checked the test2 and test3 grades myself.
+
+Each question runs 3 times. Each test set was run once, after review and sealing.
+
+| Test set | Questions | Automatic | Read: correct | Notes |
+|---|---|---|---|---|
+| test | 15 | 45 / 45 | 31 / 45 | 7 minor, 6 wrong, 1 no answer |
+| test2 | 14 | 36 / 42 | 29 / 42 | forum 12 / 21, written 17 / 21 |
+| test3 | 15 | 45 / 45 | 29 / 45 | main point right 42 / 45; 14 runs with a false detail |
+
+Dev, latest (33 questions × 3): automatic pass^3 0.97, median 22 s per answer on one RTX 3090.
+
+The gap between the two columns is the main finding: automatic checks can't see a false detail.
+[docs/experiments.md](docs/experiments.md) covers where those come from and what was tried.
 
 ## Run
 

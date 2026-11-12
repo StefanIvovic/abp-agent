@@ -1,12 +1,15 @@
 # Evals
 
-Datasets are in `datasets/`: `dev.jsonl` to develop against, `test.jsonl` to confirm a change.
+Datasets are in `datasets/`: `dev.jsonl` to develop against, and three sealed test sets,
+`test.jsonl`, `test2.jsonl` and `test3.jsonl`. A new test set is written once the last one has been
+read and diagnosed, so there is always a score on questions nobody has tuned against.
 The format is in `schema.py`.
 
 ```powershell
 docker compose run --rm -v "${PWD}:/app" api python -m evals.verify          # check everything
 docker compose run --rm -v "${PWD}:/app" api python -m evals.verify --seal   # freeze the test split
 docker compose run --rm -v "${PWD}:/app" api python -m evals.verify --seal test2   # freeze the second one
+docker compose run --rm -v "${PWD}:/app" api python -m evals.verify --seal test3   # and the third
 ```
 
 ## Rules
