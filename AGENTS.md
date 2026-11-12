@@ -4,7 +4,6 @@ Follow README.md for setup. Notes that matter when you drive it:
 
 - Everything runs in Docker: `docker compose up -d --build`, then `docker compose ps` until healthy.
   Run Python through `docker compose run --rm -v "${PWD}:/app" api ...`, not on the host.
-- Ports clash with `dvd-agent` (MLflow 5001, Prefect 4201). Stop that stack first.
 - `.env` is required: copy `.env.example`. Ask the user for passwords, `ABP_REPO_DIR` and
   `MCP_TOKEN`; don't copy them from other files or make them up. Never commit `.env`.
 - Both models run in LM Studio on the host: qwen3.8-27b (chat) and text-embedding-bge-m3

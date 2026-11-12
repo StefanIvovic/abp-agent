@@ -106,8 +106,7 @@ checked against (`ABP_COMMIT` in `evals/schema.py`). Nothing else is installed o
    copy .env.example .env
    ```
 
-4. **Start the stack.** The ports clash with `dvd-agent` (MLflow 5001, Prefect 4201), so stop that
-   first if it runs. Migrations run on their own.
+4. **Start the stack.** Migrations run on their own.
 
    ```powershell
    docker compose up -d --build
