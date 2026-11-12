@@ -8,6 +8,7 @@ import psycopg
 from neo4j import AsyncGraphDatabase
 
 from abp_agent.config import Settings
+from abp_agent.core.embeddings import native_api
 
 CheckResult = tuple[bool, str]
 
@@ -40,14 +41,17 @@ async def check_neo4j(s: Settings) -> CheckResult:
     return True, f"neo4j {records[0]['v']}, apoc {apoc['v']}"
 
 
-async def check_ollama(s: Settings) -> CheckResult:
+async def check_embed(s: Settings) -> CheckResult:
+    """The embedding model must already be loaded in LM Studio: a request to an unloaded model
+    would make LM Studio load it on demand, which can unload the chat model."""
     async with httpx.AsyncClient(timeout=3) as c:
-        r = await c.get(f"{s.ollama_base_url}/api/tags")
+        r = await c.get(native_api(s.embed_base_url))
         r.raise_for_status()
-    names = [m["name"] for m in r.json().get("models", [])]
-    if not any(n.split(":")[0] == s.embed_model for n in names):
-        return False, f"model '{s.embed_model}' not pulled (have: {names})"
-    return True, f"{s.embed_model} ready"
+    state = next((m.get("state", "not-loaded") for m in r.json().get("data", [])
+                  if m["id"] == s.embed_model), "missing")
+    if state != "loaded":
+        return False, f"{s.embed_model} is {state}: lms load {s.embed_model} --gpu off -c 2048"
+    return True, f"{s.embed_model} loaded"
 
 
 async def check_mlflow(s: Settings) -> CheckResult:
@@ -79,7 +83,7 @@ async def check_llm(s: Settings) -> CheckResult:
 CHECKS: dict[str, Callable[[Settings], Awaitable[CheckResult]]] = {
     "postgres": check_postgres,
     "neo4j": check_neo4j,
-    "ollama": check_ollama,
+    "embed": check_embed,
     "mlflow": check_mlflow,
     "prefect": check_prefect,
     "llm": check_llm,

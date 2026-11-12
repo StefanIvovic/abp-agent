@@ -25,9 +25,9 @@ class Settings(BaseSettings):
     llm_model: str = "qwen3.8-27b"
     llm_api_key: str = "not-needed"
 
-    # Embeddings
-    ollama_base_url: str = "http://localhost:11434"
-    embed_model: str = "nomic-embed-text"
+    # Embeddings: bge-m3 in LM Studio, beside the chat model (D41)
+    embed_base_url: str = "http://host.docker.internal:1234/v1"
+    embed_model: str = "text-embedding-bge-m3"
 
     # Platform services
     mlflow_tracking_uri: str = "http://localhost:5000"

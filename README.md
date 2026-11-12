@@ -46,7 +46,8 @@ Two scores, reported separately (D21, D25):
   Claude in a session, using rules set from my marks on test answers (D25), so the grader isn't
   independent (D4). I haven't yet spot-checked the test2 and test3 grades myself.
 
-Each question runs 3 times. Each test set was run once, after review and sealing.
+Each question runs 3 times. Each test set's first run, after review and sealing, is its reported
+score; later runs on a changed setup are listed separately below.
 
 | Test set | Questions | Automatic | Read: correct | Notes |
 |---|---|---|---|---|
@@ -54,15 +55,39 @@ Each question runs 3 times. Each test set was run once, after review and sealing
 | test2 | 14 | 36 / 42 | 29 / 42 | forum 12 / 21, written 17 / 21 |
 | test3 | 15 | 45 / 45 | 29 / 45 | main point right 42 / 45; 14 runs with a false detail |
 
-Dev, latest (33 questions × 3): automatic pass^3 0.97, median 22 s per answer on one RTX 3090.
+Dev (33 questions × 3), last run on that setup: automatic pass^3 0.97, median 22 s per answer on
+one RTX 3090.
+
+The table above was measured with nomic-embed-text embeddings on ABP `dev` at the pinned commit
+`d1bf7f6f2b`. The app now uses bge-m3 (D41), and the index was rebuilt from ABP 10.7.1. Automatic
+checks on the new setup, 3 runs per question:
+
+| Run | Automatic | pass^3 | Proof found | Median s | Notes |
+|---|---|---|---|---|---|
+| dev, before (nomic, ABP dev) | 98 / 99 | 0.97 | 0.93 | 22.4 | |
+| dev-v9-bge | 99 / 99 | 1.00 | 0.98 | 19.7 | |
+| test3, before (nomic, ABP dev) | 45 / 45 | 1.00 | 0.98 | 30.5 | the reported score |
+| test3-v2-bge | 44 / 45 | 0.93 | 1.00 | 31.2 | after the c075 key fix; c065 cited a passage it wasn't given |
+
+Search found the proof more often, but the embedding model and the ABP version changed together, so
+the gain can't be put on either one. Both sets had been read before, and these answers haven't been
+read-graded, so they show nothing broke, not a new correctness score.
 
 The gap between the two columns is the main finding: automatic checks can't see a false detail.
 [docs/experiments.md](docs/experiments.md) covers where those come from and what was tried.
 
 ## Run
 
-Requires Docker Desktop, a local model server and a local clone of
+Requires Docker Desktop, [LM Studio](https://lmstudio.ai) on the host and a local clone of
 [abpframework/abp](https://github.com/abpframework/abp). Nothing else is installed on the host.
+
+LM Studio serves both models. Load them yourself before starting: the app never asks LM Studio to
+load a model, because an on-demand load can unload the other one.
+
+```powershell
+lms load qwen3.8-27b                                # chat model, on the GPU
+lms load text-embedding-bge-m3 --gpu off -c 2048    # embeddings, on the CPU (D17, D41)
+```
 
 ```powershell
 copy .env.example .env      # then set passwords and ABP_REPO_DIR
@@ -82,7 +107,9 @@ docker compose ps           # wait until everything is healthy
 ## Data and search
 
 ```powershell
-# Load the ABP docs, C# and JavaScript (later runs skip unchanged files)
+# Load the ABP docs, C# and JavaScript (later runs skip unchanged files). After a change of
+# embedding model the migration empties the tables, so this loads everything again; then rebuild
+# the graph, since its links point at chunk ids
 docker compose exec pipelines prefect deployment run "ingest/ingest" --watch
 
 # Search: mode = bm25 | vector | hybrid, sources = docs, code (or try it at /docs)

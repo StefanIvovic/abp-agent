@@ -10,14 +10,13 @@ x-app: &app
   environment:
     POSTGRES_HOST: postgres
     NEO4J_URI: bolt://neo4j:7687
-    OLLAMA_BASE_URL: http://ollama:11434
     MLFLOW_TRACKING_URI: http://mlflow:5000
     PREFECT_API_URL: http://prefect-server:4200/api
     API_URL: http://api:8000
     ABP_REPO_DIR: /sources/abp              # inside the container; .env holds the host path for the mount
     GIT_PYTHON_REFRESH: quiet               # MLflow probes for git, which isn't in the image
   extra_hosts:
-    - "host.docker.internal:host-gateway"   # lets containers reach the LLM server on the host
+    - "host.docker.internal:host-gateway"   # lets containers reach LM Studio (chat and embeddings) on the host
   volumes:
     - ./evals:/app/evals                    # eval datasets/results, editable from the host
     # The ABP repository, read-only. ABP_REPO_DIR in .env overrides the default.
@@ -56,28 +55,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 30
-
-  ollama:
-    image: ollama/ollama:0.40.13
-    ports: ["11436:11434"]
-    volumes:
-      - ollama_data:/root/.ollama
-    # CPU on purpose: on the GPU these few hundred MB push the LLM over the card, and its prompt
-    # reading fell from about 1,100 to 48 tokens a second (D17)
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-
-  ollama-init:                                # one-shot: download the embedding model
-    image: ollama/ollama:0.40.13
-    environment:
-      OLLAMA_HOST: http://ollama:11434
-    entrypoint: ["ollama", "pull", "${EMBED_MODEL}"]
-    depends_on:
-      ollama: { condition: service_healthy }
-    restart: "no"
 
   mlflow:
     build:
@@ -132,7 +109,6 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
       neo4j: { condition: service_healthy }
-      ollama: { condition: service_healthy }
       mlflow: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')"]
@@ -163,7 +139,6 @@ services:
     depends_on:
       prefect-server: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
-      ollama: { condition: service_healthy }
     develop:
       watch:
         - { action: sync+restart, path: ./src, target: /app/src }
@@ -172,5 +147,4 @@ services:
 volumes:
   postgres_data:
   neo4j_data:
-  ollama_data:
   mlflow_artifacts:
