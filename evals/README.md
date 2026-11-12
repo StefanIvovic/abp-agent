@@ -72,6 +72,20 @@ covers: two graph, two abstain, two exact signatures and one injection.
 
 Each one re-sealed with `verify --seal`, after `verify` passed at the pinned ABP commit.
 
+- **2026-11-12, pin moved to ABP 10.7.1 (`6aeb69d831`) from `dev` `d1bf7f6f2b` (D42).** 7 of the
+  124 quoted files differ between the two. Re-read each key against its diff:
+  - c003, c069 (a conversion helper call), c068 (a .NET 11 helper removed), c064 (a bulk `SetAsync`
+    overload removed) and c025 (the file-system provider retries with Polly): what the keys claim is
+    unchanged, so they stay as they were.
+  - test3 c066: same answer, but the Docs module uses the NEST client in 10.7.1, so two quotes now
+    use its lines (`new ConnectionSettings(node)`, `settings.BasicAuthentication(...)`).
+  - test3 c073: `docs/en/low-code/deleted-objects.md` isn't in 10.7.1, so its evidence and the
+    sentence about the low-code "Purge for good" were removed. The key's point, that ABP has no
+    built-in purge of soft-deleted rows, still holds; "purge" appears nowhere in 10.7.1 outside blog
+    posts and community articles.
+
+  test3 re-sealed; test and test2 didn't change.
+
 - **2026-11-12, test3 c075:** `must_not_match` was `RequiresNew\s*=`, meant to catch the
   nonexistent `[UnitOfWork(RequiresNew = true)]`. Patterns match ignoring case, so it also failed a
   correct answer that quoted the real signature `Begin(AbpUnitOfWorkOptions options, bool

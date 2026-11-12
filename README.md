@@ -58,8 +58,9 @@ score; later runs on a changed setup are listed separately below.
 Dev (33 questions × 3), last run on that setup: automatic pass^3 0.97, median 22 s per answer on
 one RTX 3090.
 
-The table above was measured with nomic-embed-text embeddings on ABP `dev` at the pinned commit
-`d1bf7f6f2b`. The app now uses bge-m3 (D41), and the index was rebuilt from ABP 10.7.1. Automatic
+The table above was measured with nomic-embed-text embeddings on ABP `dev` at commit
+`d1bf7f6f2b`, the pin at the time. The app now uses bge-m3 (D41), and both the index and the eval
+keys are now on ABP 10.7.1 (D42). Automatic
 checks on the new setup, 3 runs per question:
 
 | Run | Automatic | pass^3 | Proof found | Median s | Notes |
@@ -79,7 +80,13 @@ The gap between the two columns is the main finding: automatic checks can't see 
 ## Run
 
 Requires Docker Desktop, [LM Studio](https://lmstudio.ai) on the host and a local clone of
-[abpframework/abp](https://github.com/abpframework/abp). Nothing else is installed on the host.
+[abpframework/abp](https://github.com/abpframework/abp) at ABP 10.7.1, the commit the eval keys are
+checked against (`ABP_COMMIT` in `evals/schema.py`). Nothing else is installed on the host.
+
+```powershell
+git clone https://github.com/abpframework/abp.git
+git -C abp checkout 6aeb69d831      # ABP 10.7.1; then set ABP_REPO_DIR in .env to this folder
+```
 
 LM Studio serves both models. Load them yourself before starting: the app never asks LM Studio to
 load a model, because an on-demand load can unload the other one.

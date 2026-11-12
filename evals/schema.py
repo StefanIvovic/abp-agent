@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-ABP_COMMIT = "d1bf7f6f2b"       # every key is true of this commit; bump it only with a re-check
+ABP_COMMIT = "6aeb69d831"       # every key is true of this commit; bump it only with a re-check
 
 Kind = Literal[
     "docs",         # the docs answer it
