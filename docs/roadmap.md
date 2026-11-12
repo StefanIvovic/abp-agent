@@ -14,7 +14,7 @@ makes judgment calls, code enforces what must always hold.
 | 5. Agent | One LangGraph agent, constrained router, code-side routing where the question type is clear | Agent eval runs, pass^3 reported | Done |
 | 6. Guards | Answers held until the output guard passes; every code name checked against ABP; claim check as a review aid | Unit test: a replaced draft never reaches the client | Done |
 | 7. Monitoring | MLflow traces with decision tags, feedback, failures become eval cases | The full loop can be demoed | Done |
-| 8. MCP and CI | Read tools over MCP, with auth; tests and lint in CI | A client connects; CI runs on each push | MCP done; CI written and passing locally, not connected (D33) |
+| 8. MCP and CI | Read tools over MCP, with auth; tests and lint in CI | A client connects; CI runs on each push | Done; CI on GitHub Actions (D43) |
 
 ## Carried over from the earlier prototype
 

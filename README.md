@@ -77,30 +77,63 @@ read-graded, so they show nothing broke, not a new correctness score.
 The gap between the two columns is the main finding: automatic checks can't see a false detail.
 [docs/experiments.md](docs/experiments.md) covers where those come from and what was tried.
 
-## Run
+## First run
 
 Requires Docker Desktop, [LM Studio](https://lmstudio.ai) on the host and a local clone of
 [abpframework/abp](https://github.com/abpframework/abp) at ABP 10.7.1, the commit the eval keys are
 checked against (`ABP_COMMIT` in `evals/schema.py`). Nothing else is installed on the host.
 
-```powershell
-git clone https://github.com/abpframework/abp.git
-git -C abp checkout 6aeb69d831      # ABP 10.7.1; then set ABP_REPO_DIR in .env to this folder
-```
+1. **Get ABP at the pinned commit.**
 
-LM Studio serves both models. Load them yourself before starting: the app never asks LM Studio to
-load a model, because an on-demand load can unload the other one.
+   ```powershell
+   git clone https://github.com/abpframework/abp.git
+   git -C abp checkout 6aeb69d831      # ABP 10.7.1
+   ```
 
-```powershell
-lms load qwen3.8-27b                                # chat model, on the GPU
-lms load text-embedding-bge-m3 --gpu off -c 2048    # embeddings, on the CPU (D17, D41)
-```
+2. **Load both models in LM Studio.** The app never asks LM Studio to load a model, because an
+   on-demand load can unload the other one. `lms ps` should list both.
 
-```powershell
-copy .env.example .env      # then set passwords and ABP_REPO_DIR
-docker compose up -d --build
-docker compose ps           # wait until everything is healthy
-```
+   ```powershell
+   lms load qwen3.8-27b                                # chat model, on the GPU
+   lms load text-embedding-bge-m3 --gpu off -c 2048    # embeddings, on the CPU (D17, D41)
+   ```
+
+3. **Fill in `.env`.** Copy the example, then set `POSTGRES_PASSWORD`, `NEO4J_PASSWORD`,
+   `ABP_REPO_DIR` (the ABP folder from step 1, absolute or relative to this folder) and `MCP_TOKEN`
+   (only needed for MCP; the command to generate one is in the file).
+
+   ```powershell
+   copy .env.example .env
+   ```
+
+4. **Start the stack.** The ports clash with `dvd-agent` (MLflow 5001, Prefect 4201), so stop that
+   first if it runs. Migrations run on their own.
+
+   ```powershell
+   docker compose up -d --build
+   docker compose ps           # wait until everything is healthy
+   Invoke-RestMethod http://localhost:8011/health    # every component ok, embed "loaded"
+   ```
+
+5. **Load the data, then build the graph.** Ingest embeds about 12,700 chunks on the CPU, so it
+   takes a while; the graph takes about a minute and a half. The graph links point at chunk ids, so
+   rebuild it after every full ingest.
+
+   ```powershell
+   docker compose exec pipelines prefect deployment run "ingest/ingest" --watch
+   docker compose exec pipelines prefect deployment run "build-graph/build" --watch
+   ```
+
+6. **Ask a question** in the UI (http://localhost:8502), or through the API:
+
+   ```powershell
+   $body = '{"message": "Which classes implement IEmailSender in ABP, and which one is used by default?"}'
+   Invoke-RestMethod -Method Post http://localhost:8011/agent/invoke -Body $body -ContentType application/json
+   ```
+
+   Expected: `SmtpEmailSender` (the default), `NullEmailSender` and `MailKitSmtpEmailSender`, with
+   `[id]` citations, and a note that the startup template uses `NullEmailSender` in DEBUG. About
+   15-20 seconds.
 
 | What | URL |
 |---|---|
@@ -114,9 +147,8 @@ docker compose ps           # wait until everything is healthy
 ## Data and search
 
 ```powershell
-# Load the ABP docs, C# and JavaScript (later runs skip unchanged files). After a change of
-# embedding model the migration empties the tables, so this loads everything again; then rebuild
-# the graph, since its links point at chunk ids
+# Reload the ABP docs, C# and JavaScript after the ABP folder changes (unchanged files are
+# skipped). Rebuild the graph afterwards
 docker compose exec pipelines prefect deployment run "ingest/ingest" --watch
 
 # Search: mode = bm25 | vector | hybrid, sources = docs, code (or try it at /docs)
@@ -177,9 +209,8 @@ claude mcp add --transport http abp-agent http://localhost:8011/mcp --header "Au
 
 ## CI
 
-`.github/workflows/ci.yml` builds the image, then runs lint and tests in it on each push. It is ready
-but not connected: the repository is local for now, so it only runs once it has a GitHub remote.
-To run the same steps locally:
+`.github/workflows/ci.yml` builds the image, then runs lint and tests in it on each push and pull
+request, on GitHub Actions. To run the same steps locally:
 
 ```powershell
 docker build -f docker/app.Dockerfile -t abp-agent-app:ci .
