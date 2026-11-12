@@ -196,6 +196,21 @@ def test_only_inline_code_is_read():
     assert claims.code_names("MailMessage in prose\n```\nFakeThing x;\n```") == set()
 
 
+def test_a_type_a_sample_uses_must_exist():
+    answer = ("Set it up:\n```csharp\nConfigure<AbpDddOptions>(o => { });\n"
+              "var x = new AbpClockOptions();\n```")
+    assert claims.check_names(answer, "q", {"AbpClockOptions"}) == ["AbpDddOptions"]
+
+
+def test_types_the_answer_declares_or_an_unmarked_fence_holds_are_not_claims():
+    answer = ("```csharp\npublic class PersonHandler : IDistributedEventHandler<UserEto> { }\n"
+              "private const string ItemsPropertyName = \"x\";\n```\n"
+              "```csharp\nservices.AddTransient<PersonHandler>();\n"
+              "var name = ItemsPropertyName.Trim(); // FakeInComment<Here>\n```\n"
+              "```\nAccountName=x;EndpointSuffix=core\n```")
+    assert claims.check_names(answer, "q", {"IDistributedEventHandler", "UserEto"}) == []
+
+
 def test_claims_are_read_from_the_schema():
     assert claims.read_claims('{"unsupported": ["A", " "]}') == ["A"]
 

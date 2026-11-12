@@ -1,8 +1,8 @@
 """Checks on what an answer claims. A citation proves a passage was retrieved, not that it says
 what the sentence says, so these read the answer itself:
 
-- check_names: every code name an answer claims must exist somewhere in ABP. Plain code, no LLM,
-  almost free. Runs on live answers.
+- check_names: every code name an answer claims must exist somewhere in ABP: names in inline code,
+  and types that C# samples use. Plain code, no LLM, almost free. Runs on live answers.
 - unseen_calls: calls in code samples must appear in what was retrieved this turn. Plain code too,
   and runs on live answers.
 - check_claims: one LLM call compares the answer with the passages it cites. It finds real
@@ -47,6 +47,13 @@ COMMON_CALLS = frozenset({
     "FromHours", "FromMinutes", "FromSeconds", "Insert", "MailAddress", "RemoveAll", "Replace", "Scoped", "Single", "Singleton",
     "ToDictionary", "Transient"})
 _QUOTED = re.compile(r"\"[^\"]*\"")     # a string in a sample is the reader's value, not an API
+_COMMENT = re.compile(r"//[^\n]*|/\*.*?\*/", re.DOTALL)
+# A name used as a type in a sample: a generic argument, new, typeof, an attribute, a base type or
+# static access. Configure<AbpDddOptions>(...) put an invented type past both checks.
+_T = r"((?:[A-Z][a-z0-9]+){2,}[A-Za-z0-9]*|I[A-Z][a-z]+[A-Za-z0-9]*)"
+_TYPE_USE = re.compile(rf"<\s*{_T}\b|,\s*{_T}\s*>|\bnew\s+{_T}\b|typeof\({_T}\)|\[{_T}\b"
+                       rf"|:\s*{_T}\b|(?<![\w.]){_T}\.(?=[A-Z])")
+_MEMBER_DECLARES = re.compile(r"\b(?:const|static|readonly)\s+\w+\s+(\w+)|\b\w+\s+(\w+)\s*\{\s*get")
 _PLACEHOLDER = re.compile(r"(?:My|Your|Sample|Example)[A-Z]")   # the reader's names, not ABP's
 _DOTNET_NAMESPACE = ("System.", "Microsoft.")
 # .NET members answers name in prose. Not in ABP's text, so the name list can't know them.
@@ -85,9 +92,28 @@ def code_names(answer: str) -> set[str]:
             if not _PLACEHOLDER.match(n)}
 
 
+def sample_types(answer: str) -> set[str]:
+    """Names C# samples use as types, minus anything the answer declares in any sample: the
+    reader's own classes, methods, constants and properties. Only fences marked as C#, since an
+    unmarked one may be a connection string or config. Checked on 169 saved answers with code:
+    4 of 5 flags were invented ABP types, the fifth the reader's example entity."""
+    found: set[str] = set()
+    for language, code in _SAMPLE.findall(answer):
+        if language and language.lower() in _CSHARP:
+            code = _QUOTED.sub(" ", _COMMENT.sub(" ", code))
+            for groups in _TYPE_USE.findall(code):
+                found.update(g for g in groups if g)
+    declared = set(_DECLARED.findall(answer)) | set(_SAMPLE_DECLARES.findall(answer))
+    for constant, prop in _MEMBER_DECLARES.findall(answer):
+        declared |= {constant, prop}
+    return {n for n in found - declared - DOTNET_NAMES if not _PLACEHOLDER.match(n)}
+
+
 def check_names(answer: str, question: str, known: frozenset[str] | set[str]) -> list[str]:
-    """Names in the answer that exist nowhere in ABP and weren't in the question."""
-    return sorted(code_names(answer) - set(known) - set(IDENTIFIER.findall(question)))
+    """Names in the answer that exist nowhere in ABP and weren't in the question: from inline code,
+    and from the types C# samples use."""
+    claimed = code_names(answer) | sample_types(answer)
+    return sorted(claimed - set(known) - set(IDENTIFIER.findall(question)))
 
 
 def unseen_calls(answer: str, seen: set[str]) -> list[str]:
